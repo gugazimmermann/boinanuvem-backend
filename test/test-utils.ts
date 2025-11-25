@@ -110,7 +110,9 @@ export async function setupTestDatabase(): Promise<PrismaClient> {
 /**
  * Teardown test database
  */
-export async function teardownTestDatabase(prisma: PrismaClient): Promise<void> {
+export async function teardownTestDatabase(
+  prisma: PrismaClient,
+): Promise<void> {
   await cleanupTestData(prisma);
   await prisma.$disconnect();
 }

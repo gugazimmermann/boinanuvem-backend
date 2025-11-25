@@ -6,7 +6,6 @@ import { GetPlansQueryDto } from './dto/plan.dto';
 
 describe('PlansController', () => {
   let controller: PlansController;
-  let service: PlansService;
 
   const mockPlansService = {
     findAll: jest.fn(),
@@ -64,7 +63,6 @@ describe('PlansController', () => {
     }).compile();
 
     controller = module.get<PlansController>(PlansController);
-    service = module.get<PlansService>(PlansService);
   });
 
   afterEach(() => {
@@ -82,7 +80,7 @@ describe('PlansController', () => {
 
       const result = await controller.findAll(query);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockPlans);
     });
 
@@ -93,7 +91,7 @@ describe('PlansController', () => {
 
       const result = await controller.findAll(query);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
       expect(result).toEqual(activePlans);
     });
 
@@ -111,7 +109,7 @@ describe('PlansController', () => {
 
       const result = await controller.findAll(query);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
       expect(result).toEqual(inactivePlans);
     });
 
@@ -125,7 +123,7 @@ describe('PlansController', () => {
 
       const result = await controller.findAll(query);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
       expect(result).toEqual(allPlans);
     });
 
@@ -135,7 +133,7 @@ describe('PlansController', () => {
       mockPlansService.findAll.mockRejectedValue(error);
 
       await expect(controller.findAll(query)).rejects.toThrow(error);
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
     });
 
     it('should log the query parameters', async () => {
@@ -158,7 +156,7 @@ describe('PlansController', () => {
 
       const result = await controller.findAll(query);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith(query);
       expect(result).toEqual([]);
     });
   });

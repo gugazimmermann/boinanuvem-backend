@@ -4,6 +4,40 @@ import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 
+// Type definitions for API responses
+interface PlanLimits {
+  properties: string;
+  locations: string;
+  animals: string;
+  members: string;
+}
+
+interface PlanResponse {
+  id: string;
+  name: string;
+  description: string;
+  monthlyPrice: string;
+  annualPrice: string;
+  limits: PlanLimits;
+  features: string[];
+  popular: boolean;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  body: PlanResponse[];
+}
+
+interface ErrorResponse {
+  body: {
+    message: string | string[];
+    error?: string;
+    statusCode?: number;
+  };
+}
+
 // Skip e2e tests if database is not available
 const describeOrSkip = process.env.SKIP_E2E_TESTS ? describe.skip : describe;
 
@@ -137,105 +171,123 @@ describeOrSkip('Plans API (e2e)', () => {
 
   describe('/plans (GET)', () => {
     it('should return active plans by default', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(2);
 
       // All returned plans should be active
-      response.body.forEach((plan: any) => {
+      response.body.forEach((plan: PlanResponse) => {
         expect(plan.status).toBe('active');
       });
 
       // Should include our test plans
-      const testPlanNames = response.body.map((plan: any) => plan.name);
+      const testPlanNames = response.body.map(
+        (plan: PlanResponse) => plan.name,
+      );
       expect(testPlanNames).toContain('E2E Test Plan Active');
       expect(testPlanNames).toContain('E2E Test Plan Popular');
       expect(testPlanNames).not.toContain('E2E Test Plan Inactive');
     });
 
     it('should return active plans when status=active', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=active')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(2);
 
-      response.body.forEach((plan: any) => {
+      response.body.forEach((plan: PlanResponse) => {
         expect(plan.status).toBe('active');
       });
     });
 
     it('should return inactive plans when status=inactive', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=inactive')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(1);
 
-      response.body.forEach((plan: any) => {
+      response.body.forEach((plan: PlanResponse) => {
         expect(plan.status).toBe('inactive');
       });
 
-      const testPlanNames = response.body.map((plan: any) => plan.name);
+      const testPlanNames = response.body.map(
+        (plan: PlanResponse) => plan.name,
+      );
       expect(testPlanNames).toContain('E2E Test Plan Inactive');
     });
 
     it('should return all plans when status=all', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=all')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(3);
 
       const activeCount = response.body.filter(
-        (plan: any) => plan.status === 'active',
+        (plan: PlanResponse) => plan.status === 'active',
       ).length;
       const inactiveCount = response.body.filter(
-        (plan: any) => plan.status === 'inactive',
+        (plan: PlanResponse) => plan.status === 'inactive',
       ).length;
 
       expect(activeCount).toBeGreaterThanOrEqual(2);
       expect(inactiveCount).toBeGreaterThanOrEqual(1);
 
-      const testPlanNames = response.body.map((plan: any) => plan.name);
+      const testPlanNames = response.body.map(
+        (plan: PlanResponse) => plan.name,
+      );
       expect(testPlanNames).toContain('E2E Test Plan Active');
       expect(testPlanNames).toContain('E2E Test Plan Popular');
       expect(testPlanNames).toContain('E2E Test Plan Inactive');
     });
 
     it('should return plans ordered by popular first, then alphabetically', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=active')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       const plans = response.body;
       const testPlanActive = plans.find(
-        (plan: any) => plan.name === 'E2E Test Plan Active',
+        (plan: PlanResponse) => plan.name === 'E2E Test Plan Active',
       );
       const testPlanPopular = plans.find(
-        (plan: any) => plan.name === 'E2E Test Plan Popular',
+        (plan: PlanResponse) => plan.name === 'E2E Test Plan Popular',
       );
 
       expect(testPlanActive).toBeDefined();
       expect(testPlanPopular).toBeDefined();
 
-      const activeIndex = plans.indexOf(testPlanActive);
-      const popularIndex = plans.indexOf(testPlanPopular);
+      const activeIndex = plans.indexOf(testPlanActive as PlanResponse);
+      const popularIndex = plans.indexOf(testPlanPopular as PlanResponse);
 
       // Popular plan should come before non-popular plan
       expect(popularIndex).toBeLessThan(activeIndex);
     });
 
     it('should return correct plan structure', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=active')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       expect(response.body.length).toBeGreaterThan(0);
 
@@ -272,18 +324,20 @@ describeOrSkip('Plans API (e2e)', () => {
     });
 
     it('should return 400 for invalid status parameter', async () => {
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=invalid')
-        .expect(400);
+        .expect(400)) as unknown as ErrorResponse;
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toEqual(expect.arrayContaining([
-        expect.stringContaining('status')
-      ]));
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([expect.stringContaining('status')]),
+      );
     });
 
     it('should handle multiple query parameters correctly', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Parameters<typeof request>[0])
         .get('/plans?status=active&extra=ignored')
         .expect(400); // Should fail due to forbidNonWhitelisted: true
     });
@@ -307,12 +361,14 @@ describeOrSkip('Plans API (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const response = (await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans?status=inactive')
-        .expect(200);
+        .expect(200)) as unknown as ApiResponse;
 
       // Should return empty array or only non-test plans
-      const testPlansInResponse = response.body.filter((plan: any) =>
+      const testPlansInResponse = response.body.filter((plan: PlanResponse) =>
         plan.name.startsWith('E2E Test Plan'),
       );
       expect(testPlansInResponse.length).toBe(0);
@@ -326,17 +382,19 @@ describeOrSkip('Plans API (e2e)', () => {
     });
 
     it('should handle case-sensitive status parameter', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Parameters<typeof request>[0])
         .get('/plans?status=Active')
         .expect(400);
 
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Parameters<typeof request>[0])
         .get('/plans?status=ACTIVE')
         .expect(400);
     });
 
     it('should set correct content-type header', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .get('/plans')
         .expect(200);
 

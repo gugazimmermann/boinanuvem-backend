@@ -16,7 +16,7 @@ describe('Security (e2e)', () => {
     app = moduleFixture.createNestApplication({
       logger: false, // Disable NestJS logging during tests
     });
-    
+
     const configService = app.get(ConfigService);
 
     // Apply the same security configuration as in main.ts
@@ -103,17 +103,18 @@ describe('Security (e2e)', () => {
     it('should apply rate limiting to requests', async () => {
       // Make sequential requests to avoid connection issues
       let rateLimitHit = false;
-      
+
       for (let i = 0; i < 50; i++) {
         try {
-          const response = await request(app.getHttpServer() as Parameters<typeof request>[0])
-            .get('/');
-          
+          const response = await request(
+            app.getHttpServer() as Parameters<typeof request>[0],
+          ).get('/');
+
           if (response.status === 429) {
             rateLimitHit = true;
             break;
           }
-          
+
           expect([200, 429]).toContain(response.status);
         } catch (error) {
           // If we get connection errors, it might be due to rate limiting
@@ -124,7 +125,7 @@ describe('Security (e2e)', () => {
           throw error;
         }
       }
-      
+
       // We expect either to hit rate limit or complete all requests successfully
       expect(rateLimitHit).toBeDefined(); // This test passes if no errors are thrown
     });

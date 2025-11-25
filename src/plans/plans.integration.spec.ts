@@ -5,7 +5,9 @@ import { PlansService } from './plans.service';
 import { GetPlansQueryDto } from './dto/plan.dto';
 
 // Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS ? describe.skip : describe;
+const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
+  ? describe.skip
+  : describe;
 
 describeOrSkip('PlansService Integration Tests', () => {
   let service: PlansService;
@@ -136,8 +138,12 @@ describeOrSkip('PlansService Integration Tests', () => {
       const result = await service.findAll(query);
 
       // Find our test plans in the results
-      const testPlanActive = result.find((plan) => plan.name === 'Test Plan Active');
-      const testPlanPopular = result.find((plan) => plan.name === 'Test Plan Popular');
+      const testPlanActive = result.find(
+        (plan) => plan.name === 'Test Plan Active',
+      );
+      const testPlanPopular = result.find(
+        (plan) => plan.name === 'Test Plan Popular',
+      );
 
       expect(testPlanActive).toBeDefined();
       expect(testPlanPopular).toBeDefined();
@@ -156,7 +162,9 @@ describeOrSkip('PlansService Integration Tests', () => {
       expect(result.length).toBeGreaterThanOrEqual(1); // At least our 1 inactive test plan
       expect(result.every((plan) => plan.status === 'inactive')).toBe(true);
 
-      const testPlan = result.find((plan) => plan.name === 'Test Plan Inactive');
+      const testPlan = result.find(
+        (plan) => plan.name === 'Test Plan Inactive',
+      );
       expect(testPlan).toBeDefined();
     });
 
@@ -167,8 +175,12 @@ describeOrSkip('PlansService Integration Tests', () => {
 
       expect(result.length).toBeGreaterThanOrEqual(3); // At least our 3 test plans
 
-      const activeCount = result.filter((plan) => plan.status === 'active').length;
-      const inactiveCount = result.filter((plan) => plan.status === 'inactive').length;
+      const activeCount = result.filter(
+        (plan) => plan.status === 'active',
+      ).length;
+      const inactiveCount = result.filter(
+        (plan) => plan.status === 'inactive',
+      ).length;
 
       expect(activeCount).toBeGreaterThanOrEqual(2);
       expect(inactiveCount).toBeGreaterThanOrEqual(1);
@@ -263,15 +275,19 @@ describeOrSkip('PlansService Integration Tests', () => {
       }).compile();
 
       const invalidService = module.get<PlansService>(PlansService);
-      
+
       // Replace the service's prisma instance with the invalid one
-      (invalidService as any).prisma = invalidPrisma;
+      Object.defineProperty(invalidService, 'prisma', {
+        value: invalidPrisma,
+        writable: true,
+        configurable: true,
+      });
 
       const query: GetPlansQueryDto = { status: 'active' };
 
       // This should throw an error due to invalid connection
       await expect(invalidService.findAll(query)).rejects.toThrow();
-      
+
       // Clean up
       await invalidPrisma.$disconnect();
     });

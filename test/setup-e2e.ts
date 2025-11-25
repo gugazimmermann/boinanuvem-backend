@@ -12,7 +12,8 @@ process.env.PORT = '3001'; // Different port for testing
 
 // Set test database URL if not provided
 if (!process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
+  process.env.DATABASE_URL =
+    'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
 }
 
 // Suppress console output during tests
@@ -32,9 +33,9 @@ afterAll(async () => {
   console.error = originalConsoleError;
   console.log = originalConsoleLog;
   console.warn = originalConsoleWarn;
-  
+
   // Force close any remaining connections
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 100));
 });
 
 // Increase test timeout for full application tests

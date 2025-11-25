@@ -184,7 +184,9 @@ describe('PlansService', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         'Fetching plans with status filter: active',
       );
-      expect(loggerSpy).toHaveBeenCalledWith(`Found ${activePlans.length} plans`);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Found ${activePlans.length} plans`,
+      );
     });
 
     it('should handle database errors', async () => {
