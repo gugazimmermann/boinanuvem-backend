@@ -1,0 +1,27 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String
+  monthlyPrice String
+  annualPrice  String
+  limits       Json     // Store limits as JSON: {properties, locations, animals, members}
+  features     String[] // Array of feature strings
+  popular      Boolean  @default(false)
+  status       String   @default("active") // "active" or "inactive"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("plans")
+}

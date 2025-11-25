@@ -76,6 +76,9 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CSP_DIRECTIVES: string = "default-src 'self'";
+
+  @IsString()
+  DATABASE_URL!: string;
 }
 
 export function validate(config: Record<string, unknown>) {

@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { PlansModule } from './plans/plans.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -32,6 +33,7 @@ import securityConfig from './common/config/security.config';
     }),
     HealthModule,
     MetricsModule,
+    PlansModule,
   ],
   controllers: [AppController],
   providers: [

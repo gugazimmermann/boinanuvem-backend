@@ -90,6 +90,7 @@ async function bootstrap() {
       .addTag('app', 'Main application endpoints')
       .addTag('health', 'Health check endpoints')
       .addTag('metrics', 'Prometheus metrics endpoints')
+      .addTag('plans', 'Pricing plans endpoints')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
