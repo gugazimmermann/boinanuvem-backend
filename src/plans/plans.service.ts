@@ -13,14 +13,28 @@ export class PlansService {
 
     const plans = await this.prisma.plan.findMany({
       where: status === 'all' ? {} : { status },
-      orderBy: [
-        { popular: 'desc' }, // Popular plans first
-        { name: 'asc' }, // Then alphabetically
-      ],
     });
 
-    this.logger.log(`Found ${plans.length} plans`);
-    return plans;
+    // Sort plans by monthly price (ascending)
+    const sortedPlans = plans.sort((a, b) => {
+      // Extract numeric value from price strings like "R$ 99,00"
+      const priceA = this.extractPriceValue(a.monthlyPrice);
+      const priceB = this.extractPriceValue(b.monthlyPrice);
+      return priceA - priceB;
+    });
+
+    this.logger.log(`Found ${plans.length} plans, sorted by price`);
+    return sortedPlans;
+  }
+
+  private extractPriceValue(priceString: string): number {
+    // Remove "R$", spaces, and convert comma to dot for decimal parsing
+    const numericString = priceString
+      .replace(/R\$\s*/g, '')
+      .replace(/\./g, '') // Remove thousands separator
+      .replace(/,/g, '.'); // Convert decimal separator
+
+    return parseFloat(numericString) || 0;
   }
 
   async onModuleDestroy() {
