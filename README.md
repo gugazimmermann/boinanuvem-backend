@@ -1,98 +1,269 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Boinanuvem Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A secure and scalable NestJS backend API built with TypeScript, featuring comprehensive security measures, health monitoring, and metrics collection.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Technology Stack
 
-## Description
+- **Framework**: NestJS 11.x
+- **Language**: TypeScript 5.x
+- **Runtime**: Node.js
+- **Security**: Helmet, CORS, Rate Limiting, Input Validation
+- **Monitoring**: Health checks, Prometheus metrics, Structured logging
+- **Testing**: Jest (Unit & E2E tests)
+- **Code Quality**: ESLint, Prettier, Husky pre-commit hooks
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Features
 
-## Project setup
+### Core API Functionality
+- RESTful API endpoints with OpenAPI/Swagger documentation
+- Global input validation and transformation
+- Structured error handling and logging
+- Environment-based configuration management
 
+### Security Features
+- **Security Headers**: Comprehensive HTTP security headers via Helmet
+- **CORS Protection**: Configurable cross-origin resource sharing
+- **Rate Limiting**: Per-IP request throttling with configurable limits
+- **Input Validation**: Automatic payload validation and sanitization
+- **Security Monitoring**: Real-time detection of SQL injection, XSS, and path traversal attempts
+- **Request Fingerprinting**: Detailed logging of suspicious activities
+
+### Health Monitoring & Metrics
+- Health check endpoints for application status
+- Prometheus metrics collection and exposure
+- Structured logging with daily rotation
+- Performance monitoring and alerting capabilities
+
+### Logging System
+- Daily rotated log files by severity level
+- Security event tracking and alerting
+- Request/response logging with configurable detail levels
+- Error tracking and debugging support
+
+## Prerequisites
+
+- **Node.js**: Version 18.x or higher
+- **npm**: Version 8.x or higher
+
+## Installation
+
+1. Clone the repository:
 ```bash
-$ npm install
+git clone <repository-url>
+cd boinanuvem-backend
 ```
 
-## Compile and run the project
-
+2. Install dependencies:
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
-
+3. Set up environment variables:
 ```bash
-# unit tests
-$ npm run test
+# Copy example environment file (create one if needed)
+cp .env.example .env
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Configure required variables:
+# - CORS_ORIGIN: Allowed origins for CORS
+# - RATE_LIMIT_TTL: Rate limiting time window (ms)
+# - RATE_LIMIT_MAX: Maximum requests per time window
+# - ENABLE_SWAGGER: Enable/disable API documentation
 ```
 
-## Deployment
+## Development
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Running the Application
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Development mode with hot reload
+npm run start:dev
+
+# Debug mode
+npm run start:debug
+
+# Production mode
+npm run start:prod
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Available Scripts
 
-## Resources
+```bash
+# Development
+npm run start:dev          # Start with hot reload
+npm run start:debug        # Start with debugging enabled
 
-Check out a few resources that may come in handy when working with NestJS:
+# Code Quality
+npm run lint               # Run ESLint with auto-fix
+npm run format             # Format code with Prettier
+npm run format:check       # Check code formatting
+npm run typecheck          # TypeScript type checking
+npm run check              # Run all quality checks
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Testing
+npm run test               # Run unit tests
+npm run test:watch         # Run tests in watch mode
+npm run test:cov           # Run tests with coverage
+npm run test:e2e           # Run end-to-end tests
+npm run test:debug         # Run tests in debug mode
 
-## Support
+# Build
+npm run build              # Build for production
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Code Quality Tools
 
-## Stay in touch
+The project uses several tools to maintain code quality:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- **ESLint**: Linting with TypeScript support
+- **Prettier**: Code formatting
+- **Husky**: Git hooks for pre-commit checks
+- **lint-staged**: Run linters on staged files only
+
+Pre-commit hooks automatically run:
+- Code formatting check
+- Linting with auto-fix
+- TypeScript type checking
+
+## API Documentation
+
+### Swagger/OpenAPI
+When `ENABLE_SWAGGER=true`, interactive API documentation is available at:
+- **Development**: `http://localhost:3000/api`
+- **Production**: Disabled by default for security
+
+### Core Endpoints
+
+#### Health Checks
+- `GET /health` - Application health status
+- `GET /health/ready` - Readiness probe
+- `GET /health/live` - Liveness probe
+
+#### Metrics
+- `GET /metrics` - Prometheus metrics (Prometheus format)
+
+#### Application
+- `GET /` - Basic application info and status
+
+## Security Features Summary
+
+### HTTP Security Headers
+- Content Security Policy (CSP)
+- HTTP Strict Transport Security (HSTS)
+- X-Frame-Options (clickjacking protection)
+- X-Content-Type-Options (MIME sniffing protection)
+- Referrer Policy
+
+### Request Protection
+- **Rate Limiting**: 
+  - Development: 100 requests/minute per IP
+  - Production: 50 requests/minute per IP
+- **CORS**: Configurable allowed origins
+- **Input Validation**: Automatic validation with class-validator
+- **Request Size Limits**: Configurable payload size restrictions
+
+### Security Monitoring
+The application actively monitors and logs:
+- SQL injection attempts
+- Cross-site scripting (XSS) attempts
+- Path traversal attempts
+- Suspicious user agents
+- Rate limit violations
+
+Security events are logged to `logs/security-*.log` and alerts to `logs/error-*.log`.
+
+### Environment-Specific Security
+- **Development**: Higher rate limits, detailed errors, Swagger enabled
+- **Production**: Lower rate limits, generic errors, Swagger disabled
+
+## Production Deployment
+
+### Build Process
+```bash
+# Install production dependencies
+npm ci --only=production
+
+# Build the application
+npm run build
+
+# Start production server
+npm run start:prod
+```
+
+### Environment Variables
+
+#### Required Variables
+```bash
+# Security
+CORS_ORIGIN=https://yourdomain.com
+RATE_LIMIT_TTL=60000
+RATE_LIMIT_MAX=50
+ENABLE_SWAGGER=false
+
+# Optional Security Headers
+HSTS_MAX_AGE=31536000
+CSP_DIRECTIVES=default-src 'self'
+```
+
+#### Production Considerations
+- Set `NODE_ENV=production`
+- Configure proper CORS origins
+- Disable Swagger documentation
+- Set up log aggregation and monitoring
+- Configure reverse proxy (nginx/Apache)
+- Implement SSL/TLS termination
+- Set up security monitoring alerts
+
+## Project Structure
+
+```
+src/
+├── common/              # Shared utilities and configurations
+│   ├── config/         # Environment and security configuration
+│   ├── dto/            # Data Transfer Objects
+│   ├── guards/         # Security guards and middleware
+│   ├── interceptors/   # Request/response interceptors
+│   └── logger/         # Custom logging service
+├── health/             # Health check module
+├── metrics/            # Prometheus metrics module
+├── app.controller.ts   # Main application controller
+├── app.module.ts       # Root application module
+├── app.service.ts      # Main application service
+└── main.ts            # Application bootstrap
+
+test/                   # End-to-end tests
+logs/                   # Application logs (auto-generated)
+dist/                   # Compiled JavaScript (auto-generated)
+```
+
+## Contributing & Development
+
+### Development Workflow
+1. Create a feature branch from `main`
+2. Make changes following the established patterns
+3. Ensure all tests pass: `npm run check`
+4. Commit changes (pre-commit hooks will run automatically)
+5. Create a pull request
+
+### Testing Strategy
+- **Unit Tests**: Test individual components and services
+- **E2E Tests**: Test complete request/response cycles
+- **Security Tests**: Validate security measures and configurations
+- **Coverage**: Maintain high test coverage for critical paths
+
+### Code Standards
+- Follow TypeScript best practices
+- Use NestJS decorators and dependency injection
+- Implement proper error handling
+- Add comprehensive logging for debugging
+- Document complex business logic
+- Follow security-first development principles
+
+## Support & Resources
+
+- **NestJS Documentation**: [https://docs.nestjs.com](https://docs.nestjs.com)
+- **Security Best Practices**: [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- **TypeScript Handbook**: [https://www.typescriptlang.org/docs/](https://www.typescriptlang.org/docs/)
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is private and unlicensed. All rights reserved.
