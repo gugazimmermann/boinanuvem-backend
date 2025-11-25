@@ -82,15 +82,17 @@ docker-compose up -d postgres
 
 4. Set up environment variables:
 ```bash
-# Copy example environment file (create one if needed)
-cp .env.example .env
+# Copy the environment template to create your .env file
+cp env.template .env
 
-# Configure required variables:
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/boinanuvem"
-CORS_ORIGIN="http://localhost:3000"
-RATE_LIMIT_TTL=60000
-RATE_LIMIT_MAX=100
-ENABLE_SWAGGER=true
+# The template includes all required variables with default values:
+# - DATABASE_URL: PostgreSQL connection string
+# - CORS_ORIGIN: Allowed origins for CORS
+# - Security settings: Rate limiting, request timeouts
+# - Application settings: Port, API prefix, Swagger
+# - Logging configuration
+# 
+# Edit .env file as needed for your environment
 ```
 
 5. Set up the database schema and seed data:

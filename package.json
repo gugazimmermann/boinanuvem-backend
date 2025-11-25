@@ -104,5 +104,8 @@
     "*.ts": [
       "bash -c 'npm run typecheck'"
     ]
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
