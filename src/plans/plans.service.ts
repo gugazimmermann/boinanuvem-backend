@@ -8,10 +8,11 @@ export class PlansService {
   private readonly prisma = new PrismaClient();
 
   async findAll(query: GetPlansQueryDto) {
-    this.logger.log(`Fetching plans with status filter: ${query.status}`);
+    const status = query.status || 'active';
+    this.logger.log(`Fetching plans with status filter: ${status}`);
 
     const plans = await this.prisma.plan.findMany({
-      where: query.status === 'all' ? {} : { status: query.status! },
+      where: status === 'all' ? {} : { status },
       orderBy: [
         { popular: 'desc' }, // Popular plans first
         { name: 'asc' }, // Then alphabetically

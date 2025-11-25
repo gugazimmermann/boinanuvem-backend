@@ -21,7 +21,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:integration": "jest --config ./test/jest-integration.json",
+    "test:integration:skip": "SKIP_INTEGRATION_TESTS=true jest --config ./test/jest-integration.json",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e:skip": "SKIP_E2E_TESTS=true jest --config ./test/jest-e2e.json",
+    "test:all": "npm run test && npm run test:integration && npm run test:e2e",
+    "test:unit-only": "npm run test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "prepare": "husky"
   },
@@ -78,6 +83,10 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "testPathIgnorePatterns": [
+      ".*\\.integration\\.spec\\.ts$",
+      ".*\\.e2e-spec\\.ts$"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

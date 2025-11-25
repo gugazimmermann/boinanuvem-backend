@@ -12,8 +12,16 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({
+      logger: false, // Disable NestJS logging during tests
+    });
     await app.init();
+  });
+
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+    }
   });
 
   it('/ (GET)', () => {
