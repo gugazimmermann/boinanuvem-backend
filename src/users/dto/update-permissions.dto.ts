@@ -1,18 +1,22 @@
-import { IsObject, ValidateNested } from 'class-validator';
+import { IsObject, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 class ResourcePermissions {
   @ApiProperty({ example: true })
+  @IsBoolean()
   view: boolean;
 
   @ApiProperty({ example: true })
+  @IsBoolean()
   add: boolean;
 
   @ApiProperty({ example: false })
+  @IsBoolean()
   edit: boolean;
 
   @ApiProperty({ example: false })
+  @IsBoolean()
   remove: boolean;
 }
 

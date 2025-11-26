@@ -29,7 +29,11 @@ export class SecurityGuard implements CanActivate {
   }
 
   private isBlacklisted(request: Request): boolean {
-    const blacklistedIPs: string[] = [];
+    // Load blacklisted IPs from environment variable
+    const blacklistedIPs: string[] =
+      process.env.BLACKLISTED_IPS?.split(',')
+        .map((ip) => ip.trim())
+        .filter((ip) => ip.length > 0) ?? [];
 
     return request.ip ? blacklistedIPs.includes(request.ip) : false;
   }
@@ -39,7 +43,7 @@ export class SecurityGuard implements CanActivate {
 
     const suspiciousPatterns = [/sqlmap/i, /nikto/i, /burp/i, /zap/i];
 
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers['user-agent'] ?? '';
     return suspiciousPatterns.some((pattern) => pattern.test(userAgent));
   }
 }

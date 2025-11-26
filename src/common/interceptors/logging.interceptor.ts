@@ -20,7 +20,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
     const { method, url, ip, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers['user-agent'] ?? '';
     const startTime = Date.now();
 
     const requestId = this.generateRequestId();
@@ -61,15 +61,15 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - startTime;
           const { statusCode } = response;
 
-          const errorMessage = error.message || 'Unknown error';
-          const errorStack = error.stack || '';
+          const errorMessage = error.message ?? 'Unknown error';
+          const errorStack = error.stack ?? '';
 
           const errorLog = {
             message: 'Request failed',
             requestId,
             method,
             url,
-            statusCode: statusCode || 500,
+            statusCode: statusCode ?? 500,
             duration: `${duration}ms`,
             error: errorMessage,
             stack: errorStack,
@@ -87,6 +87,6 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 }

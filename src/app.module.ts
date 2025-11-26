@@ -23,14 +23,14 @@ import securityConfig from './common/config/security.config';
       isGlobal: true,
       validate,
       load: [securityConfig],
-      envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
+      envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
     }),
     ThrottlerModule.forRootAsync({
       useFactory: () => ({
         throttlers: [
           {
-            ttl: parseInt(process.env.RATE_LIMIT_TTL || '60000', 10),
-            limit: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+            ttl: parseInt(process.env.RATE_LIMIT_TTL ?? '60000', 10),
+            limit: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
           },
         ],
       }),

@@ -82,7 +82,7 @@ export class UsersService {
 
       await this.emailService.sendEmailVerification(
         updateUserDto.email,
-        updateUserDto.name || user.name,
+        updateUserDto.name ?? user.name,
         verificationToken,
       );
 
@@ -283,7 +283,7 @@ export class UsersService {
 
       await this.emailService.sendEmailVerification(
         updateUserDto.email,
-        updateUserDto.name || targetUser.name,
+        updateUserDto.name ?? targetUser.name,
         verificationToken,
       );
 

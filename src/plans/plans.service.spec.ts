@@ -153,6 +153,20 @@ describe('PlansService', () => {
       expect(result[1].name).toBe('Básico');
     });
 
+    it('should handle null status with nullish coalescing', async () => {
+      const query: GetPlansQueryDto = { status: null as any };
+      const activePlans = mockPlans.filter((plan) => plan.status === 'active');
+      mockPrismaClient.plan.findMany.mockResolvedValue(activePlans);
+
+      const result = await service.findAll(query);
+
+      expect(mockPrismaClient.plan.findMany).toHaveBeenCalledWith({
+        where: { status: 'active' },
+      });
+      expect(result[0].name).toBe('Padrão');
+      expect(result[1].name).toBe('Básico');
+    });
+
     it('should order plans by popularity first, then alphabetically', async () => {
       const query: GetPlansQueryDto = { status: 'all' };
       mockPrismaClient.plan.findMany.mockResolvedValue(mockPlans);

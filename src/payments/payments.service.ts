@@ -124,13 +124,13 @@ export class PaymentsService {
 
     const paymentData = {
       companyId: dto.companyId,
-      subscriptionId: dto.subscriptionId || null,
+      subscriptionId: dto.subscriptionId ?? null,
       amount: new Decimal(dto.amount),
-      currency: dto.currency || 'BRL',
-      paymentMethod: dto.paymentMethod || null,
+      currency: dto.currency ?? 'BRL',
+      paymentMethod: dto.paymentMethod ?? null,
       dueDate: dto.dueDate,
-      description: dto.description || null,
-      externalId: dto.externalId || null,
+      description: dto.description ?? null,
+      externalId: dto.externalId ?? null,
       status: 'pending',
       ...(dto.metadata && { metadata: dto.metadata }),
     };
@@ -202,7 +202,7 @@ export class PaymentsService {
       paymentId,
       {
         status: 'paid',
-        paymentDate: paymentDate || new Date(),
+        paymentDate: paymentDate ?? new Date(),
       },
       userId,
     );
@@ -290,11 +290,11 @@ export class PaymentsService {
       failedPayments,
       cancelledPayments:
         totalPayments - paidPayments - pendingPayments - failedPayments,
-      totalAmount: totalAmount._sum.amount?.toNumber() || 0,
-      paidAmount: paidAmount._sum.amount?.toNumber() || 0,
+      totalAmount: totalAmount._sum.amount?.toNumber() ?? 0,
+      paidAmount: paidAmount._sum.amount?.toNumber() ?? 0,
       pendingAmount:
-        (totalAmount._sum.amount?.toNumber() || 0) -
-        (paidAmount._sum.amount?.toNumber() || 0),
+        (totalAmount._sum.amount?.toNumber() ?? 0) -
+        (paidAmount._sum.amount?.toNumber() ?? 0),
     };
   }
 

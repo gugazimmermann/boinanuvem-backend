@@ -32,21 +32,25 @@ export class CompaniesService {
     }
 
     // Check if company email already exists
-    const existingCompanyEmail = await this.prisma.company.findUnique({
-      where: { email: registerCompanyDto.email },
-    });
+    if (registerCompanyDto.email) {
+      const existingCompanyEmail = await this.prisma.company.findUnique({
+        where: { email: registerCompanyDto.email },
+      });
 
-    if (existingCompanyEmail) {
-      throw new ConflictException('Company with this email already exists');
+      if (existingCompanyEmail) {
+        throw new ConflictException('Company with this email already exists');
+      }
     }
 
     // Check if user email already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: registerCompanyDto.userEmail },
-    });
+    if (registerCompanyDto.userEmail) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: registerCompanyDto.userEmail },
+      });
 
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists');
+      }
     }
 
     // Create company and main user in a transaction
@@ -74,13 +78,13 @@ export class CompaniesService {
           phone: registerCompanyDto.phone,
           street: registerCompanyDto.street,
           number: registerCompanyDto.number,
-          complement: registerCompanyDto.complement || null,
+          complement: registerCompanyDto.complement ?? null,
           neighborhood: registerCompanyDto.neighborhood,
           city: registerCompanyDto.city,
           state: registerCompanyDto.state,
           zipCode: registerCompanyDto.zipCode,
-          latitude: registerCompanyDto.latitude || null,
-          longitude: registerCompanyDto.longitude || null,
+          latitude: registerCompanyDto.latitude ?? null,
+          longitude: registerCompanyDto.longitude ?? null,
           trialStartDate: trialData.trialStartDate,
           trialEndDate: trialData.trialEndDate,
           trialStatus: trialData.trialStatus,
@@ -107,28 +111,28 @@ export class CompaniesService {
       const mainUser = await tx.user.create({
         data: {
           name: registerCompanyDto.userName,
-          cpf: registerCompanyDto.userCpf || null,
+          cpf: registerCompanyDto.userCpf ?? null,
           email: registerCompanyDto.userEmail,
           phone: registerCompanyDto.userPhone,
           password: hashedPassword,
           street:
-            registerCompanyDto.userStreet || registerCompanyDto.street || null,
+            registerCompanyDto.userStreet ?? registerCompanyDto.street ?? null,
           number:
-            registerCompanyDto.userNumber || registerCompanyDto.number || null,
+            registerCompanyDto.userNumber ?? registerCompanyDto.number ?? null,
           complement:
-            registerCompanyDto.userComplement ||
-            registerCompanyDto.complement ||
+            registerCompanyDto.userComplement ??
+            registerCompanyDto.complement ??
             null,
           neighborhood:
-            registerCompanyDto.userNeighborhood ||
-            registerCompanyDto.neighborhood ||
+            registerCompanyDto.userNeighborhood ??
+            registerCompanyDto.neighborhood ??
             null,
-          city: registerCompanyDto.userCity || registerCompanyDto.city || null,
+          city: registerCompanyDto.userCity ?? registerCompanyDto.city ?? null,
           state:
-            registerCompanyDto.userState || registerCompanyDto.state || null,
+            registerCompanyDto.userState ?? registerCompanyDto.state ?? null,
           zipCode:
-            registerCompanyDto.userZipCode ||
-            registerCompanyDto.zipCode ||
+            registerCompanyDto.userZipCode ??
+            registerCompanyDto.zipCode ??
             null,
           mainUser: true,
           status: 'pending', // Will be activated after email verification

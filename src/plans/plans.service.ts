@@ -8,7 +8,7 @@ export class PlansService {
   private readonly prisma = new PrismaClient();
 
   async findAll(query: GetPlansQueryDto) {
-    const status = query.status || 'active';
+    const status = query.status ?? 'active';
     this.logger.log(`Fetching plans with status filter: ${status}`);
 
     const plans = await this.prisma.plan.findMany({
@@ -16,7 +16,7 @@ export class PlansService {
     });
 
     // Sort plans by popular first, then alphabetically by name
-    const sortedPlans = plans.sort((a, b) => {
+    const sortedPlans = plans.toSorted((a, b) => {
       // First, sort by popular (popular plans come first)
       if (a.popular !== b.popular) {
         return b.popular ? 1 : -1; // popular plans (true) come first

@@ -96,6 +96,9 @@ describe('CompaniesService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Reset to default behavior: no conflicts found
+    prismaService.company.findUnique.mockResolvedValue(null);
+    prismaService.user.findUnique.mockResolvedValue(null);
   });
 
   describe('registerCompany', () => {
@@ -165,88 +168,90 @@ describe('CompaniesService', () => {
       );
     });
 
-    it.skip('should throw ConflictException if company CNPJ already exists', async () => {
-      prismaService.$transaction.mockImplementation((callback) => {
-        const mockTx = {
-          company: {
-            findUnique: jest
-              .fn()
-              .mockResolvedValueOnce({ id: 'existing-company' }) // CNPJ check returns existing
-              .mockResolvedValueOnce(null), // Email check
-            create: jest.fn(),
-          },
-          user: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn(),
-          },
-          plan: {
-            findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
-          },
-          companySubscription: {
-            create: jest.fn(),
-          },
-        };
-        return callback(mockTx) as unknown;
+    it('should throw ConflictException if company CNPJ already exists', async () => {
+      // Mock the CNPJ check to return an existing company
+      prismaService.company.findUnique.mockImplementation((args: any) => {
+        if (args.where.cnpj) {
+          return Promise.resolve({
+            id: 'existing-company',
+            cnpj: registerDto.cnpj,
+          } as any);
+        }
+        return Promise.resolve(null);
       });
 
       await expect(service.registerCompany(registerDto)).rejects.toThrow(
         ConflictException,
       );
+      await expect(service.registerCompany(registerDto)).rejects.toThrow(
+        'Company with this CNPJ already exists',
+      );
+
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { cnpj: registerDto.cnpj },
+      });
     });
 
-    it.skip('should throw ConflictException if company email already exists', async () => {
-      prismaService.$transaction.mockImplementation((callback) => {
-        const mockTx = {
-          company: {
-            findUnique: jest
-              .fn()
-              .mockResolvedValueOnce(null) // CNPJ check
-              .mockResolvedValueOnce({ id: 'existing-company' }), // Email check returns existing
-            create: jest.fn(),
-          },
-          user: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn(),
-          },
-          plan: {
-            findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
-          },
-          companySubscription: {
-            create: jest.fn(),
-          },
-        };
-        return callback(mockTx) as unknown;
+    it('should throw ConflictException if company email already exists', async () => {
+      // Mock findUnique to return null for CNPJ check but existing company for email check
+      prismaService.company.findUnique.mockImplementation((args: any) => {
+        if (args.where.cnpj) {
+          return Promise.resolve(null); // No CNPJ conflict
+        }
+        if (args.where.email) {
+          return Promise.resolve({
+            id: 'existing-company',
+            email: registerDto.email,
+          } as any); // Email conflict
+        }
+        return Promise.resolve(null);
       });
 
       await expect(service.registerCompany(registerDto)).rejects.toThrow(
         ConflictException,
       );
+      await expect(service.registerCompany(registerDto)).rejects.toThrow(
+        'Company with this email already exists',
+      );
+
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { cnpj: registerDto.cnpj },
+      });
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { email: registerDto.email },
+      });
     });
 
-    it.skip('should throw ConflictException if user email already exists', async () => {
-      prismaService.$transaction.mockImplementation((callback) => {
-        const mockTx = {
-          company: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn(),
-          },
-          user: {
-            findUnique: jest.fn().mockResolvedValue({ id: 'existing-user' }),
-            create: jest.fn(),
-          },
-          plan: {
-            findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
-          },
-          companySubscription: {
-            create: jest.fn(),
-          },
-        };
-        return callback(mockTx) as unknown;
+    it('should throw ConflictException if user email already exists', async () => {
+      // Mock company findUnique to return null (no conflicts)
+      prismaService.company.findUnique.mockResolvedValue(null);
+      // Mock user findUnique to return an existing user
+      prismaService.user.findUnique.mockImplementation((args: any) => {
+        if (args.where.email === registerDto.userEmail) {
+          return Promise.resolve({
+            id: 'existing-user',
+            email: registerDto.userEmail,
+          } as any);
+        }
+        return Promise.resolve(null);
       });
 
       await expect(service.registerCompany(registerDto)).rejects.toThrow(
         ConflictException,
       );
+      await expect(service.registerCompany(registerDto)).rejects.toThrow(
+        'User with this email already exists',
+      );
+
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { cnpj: registerDto.cnpj },
+      });
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { email: registerDto.email },
+      });
+      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { email: registerDto.userEmail },
+      });
     });
 
     it('should throw error if Avançado plan not found', async () => {
@@ -380,6 +385,44 @@ describe('CompaniesService', () => {
       expect(mockTransaction.companySubscription.create).toHaveBeenCalledWith({
         data: mockTrialSubscription,
       });
+    });
+
+    it('should handle optional fields with nullish coalescing', async () => {
+      const registerDtoWithOptionals: RegisterCompanyDto = {
+        ...registerDto,
+        complement: '', // Empty string should be preserved
+        latitude: undefined, // Should become null
+        longitude: null, // Should remain null
+        userCpf: '', // Empty string should be preserved
+      };
+
+      const mockTransaction = {
+        company: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockCompany),
+        },
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockUser),
+        },
+        plan: {
+          findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
+        },
+        companySubscription: {
+          create: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      prismaService.$transaction.mockImplementation((callback) => {
+        return callback(mockTransaction as any);
+      });
+
+      const result = await service.registerCompany(registerDtoWithOptionals);
+
+      expect(result).toBeDefined();
+      // Verify that the service handles nullish coalescing correctly
+      expect(mockTransaction.company.create).toHaveBeenCalled();
+      expect(mockTransaction.user.create).toHaveBeenCalled();
     });
 
     it('should create main user with hashed password', async () => {

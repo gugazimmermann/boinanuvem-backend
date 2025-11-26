@@ -5,10 +5,10 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
 ## 🚀 Technology Stack
 
 ### Core Framework & Runtime
-- **Framework**: NestJS 11.x - Enterprise-grade Node.js framework
+- **Framework**: NestJS 11.0.1 - Enterprise-grade Node.js framework
 - **Language**: TypeScript 5.7.3 - Full type safety and modern JavaScript features
 - **Runtime**: Node.js 18+ - High-performance JavaScript runtime
-- **Build System**: Nest CLI with TypeScript compilation and hot reload
+- **Build System**: Nest CLI 11.0.0 with TypeScript compilation and hot reload
 
 ### Database & ORM
 - **Database**: PostgreSQL 15+ - Robust relational database with ACID compliance
@@ -17,27 +17,29 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
 - **Seeding**: Automated initial data population with comprehensive pricing plans
 
 ### Authentication & Security
-- **Authentication**: JWT with refresh tokens and bcrypt password hashing
+- **Authentication**: JWT 11.0.1 with refresh tokens and bcrypt 6.0.0 password hashing
 - **Authorization**: Role-based access control with granular permissions
-- **Email Service**: Nodemailer with Gmail SMTP integration for transactional emails
-- **Security Headers**: Helmet for comprehensive HTTP security headers
+- **Email Service**: Nodemailer 7.0.11 with Gmail SMTP integration for transactional emails
+- **Security Headers**: Helmet 7.1.0 for comprehensive HTTP security headers
 - **CORS Protection**: Configurable cross-origin resource sharing
-- **Rate Limiting**: ThrottlerModule for per-IP request throttling
-- **Input Validation**: class-validator for automatic payload validation and sanitization
+- **Rate Limiting**: ThrottlerModule 6.4.0 for per-IP request throttling
+- **Input Validation**: class-validator 0.14.0 for automatic payload validation and sanitization
 
 ### Monitoring & Observability
-- **Health Checks**: Terminus for application health monitoring
-- **Metrics**: Prometheus client for metrics collection and exposure
+- **Health Checks**: Terminus 11.0.0 for application health monitoring
+- **Metrics**: Prometheus client 15.1.3 for metrics collection and exposure
 - **Logging**: Structured logging with daily rotation and severity levels
 - **Performance**: Real-time performance monitoring and alerting capabilities
 
 ### Testing & Quality Assurance
 - **Testing Framework**: Jest 30.0.0 with comprehensive test suites
-- **Test Coverage**: Unit, Integration & E2E tests with 197+ tests total
+- **Test Coverage**: Unit, Integration & E2E tests with 524+ tests total (90.07% statement coverage)
 - **Code Quality**: ESLint 9.18.0 with TypeScript-specific rules
 - **Code Formatting**: Prettier 3.4.2 for consistent code style
 - **Git Hooks**: Husky 9.1.7 for pre-commit quality checks
 - **Type Checking**: Strict TypeScript configuration with zero tolerance for type errors
+- **Code Analysis**: SonarQube Community Edition 10.4 with Docker for comprehensive code quality analysis
+- **Quality Gates**: Automated quality gates with coverage (80%), duplication (<3%), and security thresholds
 
 ### Documentation & API
 - **API Documentation**: Swagger/OpenAPI 11.2.3 with interactive documentation
@@ -49,6 +51,7 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
 - **Containerization**: Docker & Docker Compose for development and production
 - **Multi-stage Builds**: Optimized Docker images for production deployment
 - **Environment Management**: Comprehensive environment variable configuration
+- **Code Quality Infrastructure**: SonarQube 10.4-community with PostgreSQL backend for continuous code analysis
 
 ## 🎯 Core Features
 
@@ -147,6 +150,12 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
   - Address management with geocoding integration
   - Company settings and preferences management
   - Multi-property support for large agricultural operations
+- **Cattle Management Modules** (In Development):
+  - **Animals Management**: Animal registration, tracking, and health records
+  - **Inventory Management**: Feed, supplies, and equipment tracking
+  - **Location Management**: Property and pasture management
+  - **Properties Management**: Multi-property operations support
+  - **Reports Management**: Analytics and reporting for cattle operations
 
 ### 🛡️ Enterprise Security Features
 - **Comprehensive Security Headers**: 
@@ -322,12 +331,15 @@ cd boinanuvem-backend
 npm install
 ```
 
-3. Set up the database:
+3. Set up the database and services:
 ```bash
 # Option 1: Using Docker Compose (recommended for development)
 docker-compose up -d postgres
 
-# Option 2: Use your own PostgreSQL instance
+# Option 2: Start all services including SonarQube
+docker-compose up -d
+
+# Option 3: Use your own PostgreSQL instance
 # Make sure PostgreSQL is running and create a database named 'boinanuvem'
 ```
 
@@ -469,6 +481,11 @@ npm run test:all           # Run all test suites (84 tests total)
 npm run test:watch         # Run tests in watch mode
 npm run test:cov           # Run tests with coverage
 npm run test:debug         # Run tests in debug mode
+
+# Code Quality Analysis
+npm run sonar              # Run SonarQube analysis
+npm run sonar:coverage     # Run tests with coverage + SonarQube analysis
+npm run sonar:full         # Run all tests + coverage + SonarQube analysis
 
 # Build
 npm run build              # Build for production
@@ -659,6 +676,7 @@ The application implements a granular permission system with:
 - **Rate Limiting**: 
   - Development: 100 requests/minute per IP
   - Production: 50 requests/minute per IP
+- **IP Blacklisting**: Configurable IP address blocking via environment variables
 - **Authentication Throttling**: Additional rate limiting on auth endpoints
 - **CORS**: Configurable allowed origins
 - **Input Validation**: Automatic validation with class-validator
@@ -681,13 +699,13 @@ Security events are logged to `logs/security-*.log` and alerts to `logs/error-*.
 
 ## Testing Strategy
 
-The application has comprehensive test coverage with **197 tests** across multiple test types:
+The application has comprehensive test coverage with **524 tests** across multiple test types:
 
 ### Test Coverage Summary
-- **Unit Tests**: 152 tests covering services, controllers, and guards
+- **Unit Tests**: 452 tests covering services, controllers, and guards
 - **Integration Tests**: 7 tests for database operations and business logic
-- **E2E Tests**: 33 tests for complete API endpoint workflows
-- **Skipped Tests**: 3 tests (conditional or environment-specific)
+- **E2E Tests**: 65 tests for complete API endpoint workflows
+- **Overall Coverage**: 90.07% statement coverage, 80.83% branch coverage
 
 ### Test Categories
 - **Authentication Tests**: Login, registration, token management, password operations
@@ -702,13 +720,13 @@ The application has comprehensive test coverage with **197 tests** across multip
 
 ### Running Tests
 ```bash
-# Run all tests
+# Run all tests (524 total)
 npm run test:all
 
 # Run specific test suites
-npm run test              # Unit tests only
-npm run test:integration  # Integration tests only
-npm run test:e2e         # End-to-end tests only
+npm run test              # Unit tests only (452 tests)
+npm run test:integration  # Integration tests only (7 tests)
+npm run test:e2e         # End-to-end tests only (65 tests)
 
 # Test with coverage
 npm run test:cov
@@ -823,6 +841,16 @@ src/
 ├── payments/             # Payment management module
 │   ├── payments.service.ts # Payment processing and tracking
 │   └── payments.service.spec.ts # Payment tests
+├── animals/              # Animal management module (in development)
+│   └── dto/             # Animal-related DTOs
+├── inventory/            # Inventory management module (in development)
+│   └── dto/             # Inventory-related DTOs
+├── locations/            # Location management module (in development)
+│   └── dto/             # Location-related DTOs
+├── properties/           # Properties management module (in development)
+│   └── dto/             # Property-related DTOs
+├── reports/              # Reports management module (in development)
+│   └── dto/             # Report-related DTOs
 ├── app.controller.ts     # Main application controller
 ├── app.module.ts         # Root application module
 ├── app.service.ts        # Main application service
@@ -1014,6 +1042,29 @@ curl -X POST http://localhost:3000/api/auth/register/company \
 - **JWT Best Practices**: [https://auth0.com/blog/a-look-at-the-latest-draft-for-jwt-bcp/](https://auth0.com/blog/a-look-at-the-latest-draft-for-jwt-bcp/)
 - **Security Best Practices**: [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - **TypeScript Handbook**: [https://www.typescriptlang.org/docs/](https://www.typescriptlang.org/docs/)
+
+## Code Quality with SonarQube
+
+This project includes comprehensive code quality analysis with SonarQube Community Edition. For detailed setup and usage instructions, see [SONARQUBE.md](SONARQUBE.md).
+
+### Quick SonarQube Setup
+```bash
+# Start SonarQube service (Community Edition 10.4)
+docker-compose up -d sonarqube
+
+# Run analysis with coverage
+npm run sonar:coverage
+
+# Access SonarQube dashboard
+# http://localhost:9000 (admin/admin)
+# Token: sqa_be0c38cb3c5f45b5404bebff6028947d74d054db
+```
+
+### Quality Gates
+- **Code Coverage**: Minimum 80%
+- **Code Duplication**: Maximum 3%
+- **Security**: No new vulnerabilities
+- **Maintainability**: Rating A required
 
 ## License
 

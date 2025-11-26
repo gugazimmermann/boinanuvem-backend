@@ -300,6 +300,56 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should handle optional fields with nullish coalescing', async () => {
+      const createDtoWithOptionals: CreatePaymentDto = {
+        companyId: 'company-1',
+        subscriptionId: undefined, // Should become null
+        amount: 99.99,
+        currency: '', // Empty string should be preserved with nullish coalescing
+        paymentMethod: null, // Should remain null
+        dueDate: new Date('2025-02-01'),
+        description: '', // Empty string should be preserved
+        externalId: undefined, // Should become null
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.companyPayment.create.mockResolvedValue({
+        ...mockCreatedPayment,
+        subscriptionId: null,
+        currency: '', // Empty string preserved
+        paymentMethod: null,
+        description: '',
+        externalId: null,
+      });
+
+      const result = await service.createPayment(
+        createDtoWithOptionals,
+        'user-1',
+      );
+
+      expect(result).toBeDefined();
+      expect(prismaService.companyPayment.create).toHaveBeenCalledWith({
+        data: {
+          companyId: 'company-1',
+          subscriptionId: null, // undefined became null
+          amount: new Decimal(99.99),
+          currency: '', // Empty string preserved
+          paymentMethod: null, // null remained null
+          dueDate: createDtoWithOptionals.dueDate,
+          description: '', // Empty string preserved
+          externalId: null, // undefined became null
+          status: 'pending',
+        },
+        include: {
+          subscription: {
+            include: {
+              plan: true,
+            },
+          },
+        },
+      });
+    });
+
     it('should create payment without subscription', async () => {
       const dtoWithoutSub = { ...createDto };
       delete (dtoWithoutSub as any).subscriptionId;

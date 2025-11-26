@@ -56,11 +56,11 @@ export class TrialService {
     }
 
     // Determine trial start date
-    const trialStartDate = company.trialStartDate || company.createdAt;
+    const trialStartDate = company.trialStartDate ?? company.createdAt;
 
     // Calculate trial end date
     const trialEndDate =
-      company.trialEndDate ||
+      company.trialEndDate ??
       new Date(
         trialStartDate.getTime() +
           this.TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000,
@@ -159,7 +159,7 @@ export class TrialService {
       trialEndDate: company.trialEndDate,
       trialStatus: company.trialStatus,
       createdAt: company.createdAt,
-      subscriptions: company.subscriptions || [],
+      subscriptions: company.subscriptions ?? [],
     });
 
     return trialInfo.isTrialExpired && company.trialStatus !== 'expired';

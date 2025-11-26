@@ -116,8 +116,8 @@ describeOrSkip('Plans API (e2e)', () => {
 
     // Initialize Prisma client for test data management
     const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ||
-      process.env.DATABASE_URL ||
+      process.env.TEST_DATABASE_URL ??
+      process.env.DATABASE_URL ??
       'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
 
     prisma = new PrismaClient({

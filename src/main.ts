@@ -60,7 +60,7 @@ async function bootstrap() {
       _res: Express.Response,
       next: () => void,
     ) => {
-      req.setTimeout(requestConfig?.timeout || 30000);
+      req.setTimeout(requestConfig?.timeout ?? 30000);
       next();
     },
   );
@@ -75,7 +75,7 @@ async function bootstrap() {
   const port = (configService.get('PORT') as number) ?? 3000;
 
   const environment: string =
-    (configService.get('NODE_ENV') as string) || 'development';
+    (configService.get('NODE_ENV') as string) ?? 'development';
   const swaggerConfig = configService.get('ENABLE_SWAGGER') as string;
   // Force enable Swagger in development for now
   const enableSwagger = environment === 'development';
@@ -155,6 +155,6 @@ async function bootstrap() {
 
 bootstrap().catch((error) => {
   const logger = new Logger('Bootstrap');
-  logger.error('Error starting application:', (error as Error).stack || error);
+  logger.error('Error starting application:', (error as Error).stack ?? error);
   process.exit(1);
 });

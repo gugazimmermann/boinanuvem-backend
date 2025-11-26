@@ -28,6 +28,9 @@
     "test:all": "npm run test && npm run test:integration && npm run test:e2e",
     "test:unit-only": "npm run test",
     "check": "npm run typecheck && npm run lint && npm run test",
+    "sonar": "sonar-scanner",
+    "sonar:coverage": "npm run test:cov && npm run sonar",
+    "sonar:full": "npm run test:all && npm run test:cov && npm run sonar",
     "prepare": "husky"
   },
   "dependencies": {
@@ -75,6 +78,7 @@
     "jest": "^30.0.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.4.2",
+    "sonarqube-scanner": "^4.3.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
@@ -100,9 +104,22 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!**/*.test.ts",
+      "!**/*.e2e-spec.ts",
+      "!**/*.integration.spec.ts",
+      "!**/node_modules/**",
+      "!**/dist/**",
+      "!**/main.ts",
+      "!**/prisma/**"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
     "testEnvironment": "node"
   },
   "lint-staged": {

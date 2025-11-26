@@ -20,7 +20,7 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
     const { method, url, ip, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers['user-agent'] ?? '';
     const startTime = Date.now();
 
     const fingerprint = this.generateFingerprint(request);
@@ -53,14 +53,14 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - startTime;
           const { statusCode } = response;
 
-          const errorMessage = error.message || 'Unknown error';
-          const errorStack = error.stack || '';
+          const errorMessage = error.message ?? 'Unknown error';
+          const errorStack = error.stack ?? '';
 
           const securityErrorLog = {
             event: 'request_failure',
             method,
             url,
-            statusCode: statusCode || 500,
+            statusCode: statusCode ?? 500,
             ip,
             userAgent,
             fingerprint,
@@ -84,9 +84,9 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
 
   private generateFingerprint(request: Request): string {
     const { ip, headers } = request;
-    const userAgent = headers['user-agent'] || '';
-    const acceptLanguage = headers['accept-language'] || '';
-    const acceptEncoding = headers['accept-encoding'] || '';
+    const userAgent = headers['user-agent'] ?? '';
+    const acceptLanguage = headers['accept-language'] ?? '';
+    const acceptEncoding = headers['accept-encoding'] ?? '';
 
     const fingerprint = Buffer.from(
       `${ip}:${userAgent}:${acceptLanguage}:${acceptEncoding}`,
@@ -99,7 +99,7 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
 
   private detectSuspiciousActivity(request: Request): void {
     const { url, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers['user-agent'] ?? '';
 
     if (this.containsSqlInjectionPatterns(url)) {
       this.logSecurityAlert(
@@ -204,7 +204,7 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
 
   private logSecurityAlert(request: Request, error: Error): void {
     const { method, url, ip, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers['user-agent'] ?? '';
 
     const alertLog = {
       event: 'security_alert',

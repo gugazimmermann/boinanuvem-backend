@@ -55,23 +55,7 @@ describe('Authentication with Subscription Model (e2e)', () => {
 
   describe('POST /auth/login', () => {
     it('should login and return enhanced company data with subscription info', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: testUser.email,
-          password: 'password123', // This won't work with real hash, but for e2e we'd need to set up proper test data
-        })
-        .expect(401); // Expected since password won't match hash
-
-      // For a real e2e test, we'd need to create the user with a known password
-      // Let's test the structure by creating a user with a proper hash
-      const hashedPassword = await bcrypt.hash('password123', 12);
-
-      await prisma.user.update({
-        where: { id: testUser.id },
-        data: { password: hashedPassword },
-      });
-
+      // Login should now work since we fixed password hashing in createTestCompany
       const loginResponse = await request(app.getHttpServer())
         .post('/auth/login')
         .send({

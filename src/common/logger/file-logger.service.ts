@@ -29,8 +29,8 @@ export class FileLoggerService implements LoggerService {
     const logEntry = {
       timestamp,
       level: level.toUpperCase(),
-      context: context || 'Application',
-      message: typeof message === 'object' ? message : message,
+      context: context ?? 'Application',
+      message: typeof message === 'object' ? JSON.stringify(message) : message,
       pid: process.pid,
     };
 
@@ -94,7 +94,7 @@ export class FileLoggerService implements LoggerService {
   log(message: unknown, context?: string): void {
     if (this.shouldShowInConsole(message, context)) {
       console.log(
-        `[${context || 'LOG'}]`,
+        `[${context ?? 'LOG'}]`,
         typeof message === 'object' ? JSON.stringify(message) : message,
       );
     }
@@ -107,7 +107,7 @@ export class FileLoggerService implements LoggerService {
       trace,
     };
     console.error(
-      `[${context || 'ERROR'}]`,
+      `[${context ?? 'ERROR'}]`,
       typeof message === 'object' ? JSON.stringify(message) : message,
     );
     this.writeToFile('error', errorLog, context);
@@ -115,7 +115,7 @@ export class FileLoggerService implements LoggerService {
 
   warn(message: unknown, context?: string): void {
     console.warn(
-      `[${context || 'WARN'}]`,
+      `[${context ?? 'WARN'}]`,
       typeof message === 'object' ? JSON.stringify(message) : message,
     );
     this.writeToFile('warn', message, context);
@@ -140,7 +140,7 @@ export class FileLoggerService implements LoggerService {
       'Swagger documentation available at',
     ];
 
-    if (criticalContexts.includes(context || '')) {
+    if (criticalContexts.includes(context ?? '')) {
       return true;
     }
 

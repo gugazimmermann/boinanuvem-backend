@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Check if SKIP_SONAR environment variable is set to bypass SonarQube analysis
+if [ "$SKIP_SONAR" = "true" ]; then
+  echo "⚠️  Skipping SonarQube analysis (SKIP_SONAR=true)"
+  exit 0
+fi
+
+echo "🔍 Running pre-push quality checks..."
+
+# Run tests and generate coverage
+echo "📊 Running tests with coverage..."
+npm run test:cov
+
+# Check if SonarQube is running
+if ! curl -s http://localhost:9000/api/system/status > /dev/null 2>&1; then
+  echo "⚠️  SonarQube server is not running. Please start it with: docker-compose up -d sonarqube"
+  echo "💡 To skip SonarQube analysis, use: SKIP_SONAR=true git push"
+  exit 1
+fi
+
+# Run SonarQube analysis
+echo "🔍 Running SonarQube analysis..."
+npm run sonar
+
+echo "✅ Pre-push quality checks completed successfully!"

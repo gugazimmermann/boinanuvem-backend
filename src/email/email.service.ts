@@ -93,7 +93,7 @@ Se você não solicitou este e-mail, pode ignorá-lo com segurança.
       const info = (await this.transporter.sendMail(mailOptions)) as {
         messageId?: string;
       };
-      const messageId = info.messageId || 'unknown';
+      const messageId = info.messageId ?? 'unknown';
 
       this.logger.log(
         `Email sent successfully to ${to}. Message ID: ${messageId}`,
@@ -185,7 +185,7 @@ Se você não solicitou este e-mail, pode ignorá-lo com segurança.
       'Bem-vindo ao Boi na Nuvem!',
       content,
       'Acessar Plataforma',
-      frontendUrl || '',
+      frontendUrl ?? '',
     );
 
     await this.sendEmail(email, 'Bem-vindo ao Boi na Nuvem!', html, text);

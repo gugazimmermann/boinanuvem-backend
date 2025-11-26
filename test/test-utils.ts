@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 /**
  * Test utilities for database operations and test setup
@@ -9,8 +10,8 @@ import { PrismaClient } from '@prisma/client';
  */
 export function createTestPrismaClient(): PrismaClient {
   const testDatabaseUrl =
-    process.env.TEST_DATABASE_URL ||
-    process.env.DATABASE_URL ||
+    process.env.TEST_DATABASE_URL ??
+    process.env.DATABASE_URL ??
     'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
 
   return new PrismaClient({
@@ -49,8 +50,11 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
       where: {
         company: {
           OR: [
-            { companyName: { startsWith: 'Test Company' } },
-            { companyName: { startsWith: 'E2E Test Company' } },
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
           ],
         },
       },
@@ -65,8 +69,11 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
       where: {
         company: {
           OR: [
-            { companyName: { startsWith: 'Test Company' } },
-            { companyName: { startsWith: 'E2E Test Company' } },
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
           ],
         },
       },
@@ -80,8 +87,13 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
     await prisma.user.deleteMany({
       where: {
         OR: [
-          { email: { startsWith: 'test@' } },
-          { email: { startsWith: 'e2e@' } },
+          { email: { contains: 'test' } },
+          { email: { contains: 'e2e' } },
+          { email: { contains: 'registration' } },
+          { email: { contains: 'user' } },
+          { email: { contains: 'duplicate' } },
+          { email: { contains: 'company' } },
+          { email: { contains: 'trial' } },
         ],
       },
     });
@@ -93,8 +105,24 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
     await prisma.company.deleteMany({
       where: {
         OR: [
-          { companyName: { startsWith: 'Test Company' } },
-          { companyName: { startsWith: 'E2E Test Company' } },
+          { companyName: { contains: 'Test' } },
+          { companyName: { contains: 'E2E' } },
+          { companyName: { contains: 'First' } },
+          { companyName: { contains: 'Second' } },
+          { companyName: { contains: 'Another' } },
+          { companyName: { contains: 'Other' } },
+          { companyName: { contains: 'Trial' } },
+          { companyName: { contains: 'Registration' } },
+          { companyName: { contains: 'Update' } },
+          { companyName: { contains: 'Info' } },
+          { companyName: { contains: 'Existing' } },
+          { email: { contains: 'test' } },
+          { email: { contains: 'registration' } },
+          { email: { contains: 'company' } },
+          { email: { contains: 'trial' } },
+          { email: { contains: 'update' } },
+          { email: { contains: 'info' } },
+          { email: { contains: 'existing' } },
         ],
       },
     });
@@ -328,12 +356,13 @@ export async function createTestCompany(
   });
 
   // Create main user
+  const hashedPassword = await bcrypt.hash('password123', 10);
   const user = await prisma.user.create({
     data: {
       name: 'Test User',
       email: `user@${email.split('@')[1]}`,
       phone: '(47) 99999-8888',
-      password: '$2b$12$test.hash.password',
+      password: hashedPassword,
       companyId: company.id,
       mainUser: true,
       status: 'active',
@@ -435,7 +464,7 @@ export async function createTestPayment(
   return prisma.companyPayment.create({
     data: {
       companyId,
-      subscriptionId: subscriptionId || null,
+      subscriptionId: subscriptionId ?? null,
       amount,
       currency: 'BRL',
       status,
@@ -452,8 +481,8 @@ export async function createTestPayment(
 export const testConfig = {
   database: {
     url:
-      process.env.TEST_DATABASE_URL ||
-      process.env.DATABASE_URL ||
+      process.env.TEST_DATABASE_URL ??
+      process.env.DATABASE_URL ??
       'postgresql://postgres:postgres@localhost:5432/boinanuvem_test',
   },
   app: {

@@ -127,4 +127,166 @@ describe('AuthController', () => {
       expect(result).toEqual(mockResult);
     });
   });
+
+  describe('refresh', () => {
+    it('should refresh access token successfully', async () => {
+      const refreshTokenDto = { refresh_token: 'valid-refresh-token' };
+      const expectedResult = {
+        access_token: 'new-jwt-token',
+        refresh_token: 'new-refresh-token',
+      };
+
+      mockAuthService.refreshToken.mockResolvedValue(expectedResult);
+
+      const result = await controller.refresh(refreshTokenDto);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockAuthService.refreshToken).toHaveBeenCalledWith(
+        'valid-refresh-token',
+      );
+    });
+  });
+
+  describe('logout', () => {
+    it('should logout user successfully', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+      const body = { refresh_token: 'refresh-token' };
+
+      mockAuthService.logout.mockResolvedValue(undefined);
+
+      const result = await controller.logout(user, body);
+
+      expect(result).toEqual({ message: 'Logout successful' });
+      expect(mockAuthService.logout).toHaveBeenCalledWith(
+        'user-1',
+        'refresh-token',
+      );
+    });
+
+    it('should logout user without refresh token', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+
+      mockAuthService.logout.mockResolvedValue(undefined);
+
+      const result = await controller.logout(user);
+
+      expect(result).toEqual({ message: 'Logout successful' });
+      expect(mockAuthService.logout).toHaveBeenCalledWith('user-1', undefined);
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should verify email successfully', async () => {
+      const verifyEmailDto = { token: 'valid-token' };
+      const expectedResult = { message: 'Email verified successfully' };
+
+      mockAuthService.verifyEmail.mockResolvedValue(expectedResult);
+
+      const result = await controller.verifyEmail(verifyEmailDto);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockAuthService.verifyEmail).toHaveBeenCalledWith('valid-token');
+    });
+  });
+
+  describe('resendVerification', () => {
+    it('should resend verification email successfully', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+      const token = 'verification-token';
+
+      mockAuthService.generateEmailVerificationToken.mockResolvedValue(token);
+      mockEmailService.sendEmailVerification.mockResolvedValue(undefined);
+
+      const result = await controller.resendVerification(user);
+
+      expect(result).toEqual({ message: 'Verification email sent' });
+      expect(
+        mockAuthService.generateEmailVerificationToken,
+      ).toHaveBeenCalledWith('user-1', 'test@example.com');
+      expect(mockEmailService.sendEmailVerification).toHaveBeenCalledWith(
+        'test@example.com',
+        'Test User',
+        token,
+      );
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('should send password reset email successfully', async () => {
+      const forgotPasswordDto = { email: 'test@example.com' };
+      const token = 'reset-token';
+
+      mockAuthService.generatePasswordResetToken.mockResolvedValue(token);
+      mockEmailService.sendPasswordReset.mockResolvedValue(undefined);
+
+      const result = await controller.forgotPassword(forgotPasswordDto);
+
+      expect(result).toEqual({ message: 'Password reset email sent' });
+      expect(mockAuthService.generatePasswordResetToken).toHaveBeenCalledWith(
+        'test@example.com',
+      );
+      expect(mockEmailService.sendPasswordReset).toHaveBeenCalledWith(
+        'test@example.com',
+        token,
+      );
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should reset password successfully', async () => {
+      const resetPasswordDto = {
+        token: 'valid-token',
+        password: 'newPassword123',
+      };
+      const expectedResult = { message: 'Password reset successfully' };
+
+      mockAuthService.resetPassword.mockResolvedValue(expectedResult);
+
+      const result = await controller.resetPassword(resetPasswordDto);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(
+        'valid-token',
+        'newPassword123',
+      );
+    });
+  });
+
+  describe('changePassword', () => {
+    it('should change password successfully', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+      const changePasswordDto = {
+        currentPassword: 'oldPassword',
+        newPassword: 'newPassword123',
+      };
+      const expectedResult = { message: 'Password changed successfully' };
+
+      mockAuthService.changePassword.mockResolvedValue(expectedResult);
+
+      const result = await controller.changePassword(user, changePasswordDto);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockAuthService.changePassword).toHaveBeenCalledWith(
+        'user-1',
+        'oldPassword',
+        'newPassword123',
+      );
+    });
+  });
 });
