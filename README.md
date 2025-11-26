@@ -1,88 +1,313 @@
-# Boinanuvem Backend
+# Boi na Nuvem - Backend API
 
-A secure and scalable NestJS backend API built with TypeScript for the Boinanuvem cattle management platform. Features comprehensive authentication system, subscription management with 14-day trials, payment processing, security measures, health monitoring, metrics collection, PostgreSQL database with Prisma ORM, and complete pricing plans management.
+A secure, scalable, and enterprise-grade NestJS backend API built with TypeScript for the Boi na Nuvem cattle management platform. This comprehensive backend provides a complete solution for livestock management, featuring advanced authentication systems, subscription management with trial periods, payment processing, robust security measures, health monitoring, metrics collection, and a PostgreSQL database with Prisma ORM.
 
-## Technology Stack
+## 🚀 Technology Stack
 
-- **Framework**: NestJS 11.x
-- **Language**: TypeScript 5.x
-- **Runtime**: Node.js
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT with refresh tokens, bcrypt password hashing
-- **Email Service**: Nodemailer with Gmail SMTP integration
-- **Security**: Helmet, CORS, Rate Limiting, Input Validation, Throttling
-- **Monitoring**: Health checks, Prometheus metrics, Structured logging
-- **Testing**: Jest (Unit, Integration & E2E tests) - 197 tests total
-- **Code Quality**: ESLint, Prettier, Husky pre-commit hooks
-- **Documentation**: Swagger/OpenAPI with authentication support
-- **Containerization**: Docker & Docker Compose
+### Core Framework & Runtime
+- **Framework**: NestJS 11.x - Enterprise-grade Node.js framework
+- **Language**: TypeScript 5.7.3 - Full type safety and modern JavaScript features
+- **Runtime**: Node.js 18+ - High-performance JavaScript runtime
+- **Build System**: Nest CLI with TypeScript compilation and hot reload
 
-## Features
+### Database & ORM
+- **Database**: PostgreSQL 15+ - Robust relational database with ACID compliance
+- **ORM**: Prisma 5.22.0 - Type-safe database client with auto-generated types
+- **Migrations**: Version-controlled schema changes with Prisma Migrate
+- **Seeding**: Automated initial data population with comprehensive pricing plans
 
-### Authentication & Authorization System
-- **Two-tier User System**: Main users (company owners) and regular team members
-- **Company Registration**: Complete company onboarding with main user creation and automatic trial activation
-- **JWT Authentication**: Access tokens (7-day expiry) and refresh tokens (30-day expiry)
-- **Email Verification**: Required for account activation and email changes
-- **Password Management**: Secure password reset with email verification
-- **Email Integration**: Professional HTML emails via Gmail SMTP (verification, password reset, welcome, invitations)
-- **Granular Permissions**: 4 sections (Registration, Records, Breedings, Finances) × 4 actions (view, add, edit, remove)
-- **Role-based Access Control**: Main users have full access, team members have configurable permissions
-- **Account Status Management**: Pending, active, inactive user states
-- **Trial System**: Automatic 14-day trial periods for new companies with status tracking
-
-### Core API Functionality
-- RESTful API endpoints with comprehensive OpenAPI/Swagger documentation
-- Global input validation and transformation with class-validator
-- Structured error handling and logging
-- Environment-based configuration management
-- **Plans Management**: Complete pricing plans API for subscription management
-- **Subscription Management**: Full subscription lifecycle management with trial periods
-- **Payment Management**: Payment tracking, billing, and transaction management
-- **Trial System**: 14-day trial periods with automatic management and status tracking
-- **User Management**: Team member creation, permission management, profile updates
-- **Company Management**: Company profile management and settings
-
-### Security Features
-- **Security Headers**: Comprehensive HTTP security headers via Helmet
+### Authentication & Security
+- **Authentication**: JWT with refresh tokens and bcrypt password hashing
+- **Authorization**: Role-based access control with granular permissions
+- **Email Service**: Nodemailer with Gmail SMTP integration for transactional emails
+- **Security Headers**: Helmet for comprehensive HTTP security headers
 - **CORS Protection**: Configurable cross-origin resource sharing
-- **Rate Limiting**: Per-IP request throttling with configurable limits (ThrottlerModule)
-- **Input Validation**: Automatic payload validation and sanitization
-- **Password Security**: bcrypt hashing with salt rounds
-- **JWT Security**: Secure token generation and validation with configurable expiry
-- **Security Monitoring**: Real-time detection of SQL injection, XSS, and path traversal attempts
-- **Request Fingerprinting**: Detailed logging of suspicious activities
-- **Authentication Guards**: JWT and permission-based route protection
+- **Rate Limiting**: ThrottlerModule for per-IP request throttling
+- **Input Validation**: class-validator for automatic payload validation and sanitization
 
-### Health Monitoring & Metrics
-- Health check endpoints for application status
-- Prometheus metrics collection and exposure
-- Structured logging with daily rotation
-- Performance monitoring and alerting capabilities
+### Monitoring & Observability
+- **Health Checks**: Terminus for application health monitoring
+- **Metrics**: Prometheus client for metrics collection and exposure
+- **Logging**: Structured logging with daily rotation and severity levels
+- **Performance**: Real-time performance monitoring and alerting capabilities
 
-### Logging System
-- Daily rotated log files by severity level
-- Security event tracking and alerting
-- Request/response logging with configurable detail levels
-- Error tracking and debugging support
-- Authentication event logging
+### Testing & Quality Assurance
+- **Testing Framework**: Jest 30.0.0 with comprehensive test suites
+- **Test Coverage**: Unit, Integration & E2E tests with 197+ tests total
+- **Code Quality**: ESLint 9.18.0 with TypeScript-specific rules
+- **Code Formatting**: Prettier 3.4.2 for consistent code style
+- **Git Hooks**: Husky 9.1.7 for pre-commit quality checks
+- **Type Checking**: Strict TypeScript configuration with zero tolerance for type errors
 
-### Database & ORM Features
-- **PostgreSQL**: Robust relational database with ACID compliance
-- **Prisma ORM**: Type-safe database client with auto-generated types
-- **Database Migrations**: Version-controlled schema changes
-- **Database Seeding**: Automated initial data population with pricing plans
-- **Connection Pooling**: Efficient database connection management
-- **Type Safety**: Full TypeScript integration with database operations
-- **Complex Relations**: Users, companies, authentication tokens, permissions, subscriptions, payments
-- **Trial Management**: Built-in trial period tracking and automatic expiry handling
+### Documentation & API
+- **API Documentation**: Swagger/OpenAPI 11.2.3 with interactive documentation
+- **Authentication Support**: JWT bearer token integration in Swagger UI
+- **Schema Validation**: Comprehensive request/response schema documentation
+- **Environment Configuration**: Centralized configuration management with validation
 
-## Prerequisites
+### Containerization & Deployment
+- **Containerization**: Docker & Docker Compose for development and production
+- **Multi-stage Builds**: Optimized Docker images for production deployment
+- **Environment Management**: Comprehensive environment variable configuration
 
-- **Node.js**: Version 18.x or higher
-- **npm**: Version 8.x or higher
-- **PostgreSQL**: Version 15.x or higher (or use Docker Compose)
-- **Docker & Docker Compose**: For containerized database setup (optional)
+## 🎯 Core Features
+
+### 🔐 Advanced Authentication & Authorization System
+- **Hierarchical User System**: 
+  - **Main Users**: Company owners with full administrative access and team management capabilities
+  - **Team Members**: Regular users with granular, configurable permissions
+- **Complete Company Onboarding**: 
+  - Streamlined company registration with automatic main user creation
+  - Automatic 14-day trial activation for new companies
+  - Brazilian business compliance (CNPJ validation and integration)
+- **Enterprise-Grade JWT Authentication**: 
+  - Access tokens with 7-day expiry for secure API access
+  - Refresh tokens with 30-day expiry for seamless user experience
+  - Automatic token rotation and secure storage
+- **Comprehensive Email Verification System**: 
+  - Required email verification for account activation
+  - Email change verification with secure token validation
+  - Professional HTML email templates with responsive design
+- **Advanced Password Management**: 
+  - Secure password reset with email verification workflow
+  - bcrypt hashing with configurable salt rounds
+  - Password strength validation and security policies
+- **Professional Email Integration**: 
+  - Gmail SMTP integration for reliable email delivery
+  - Four types of transactional emails: verification, password reset, welcome, and team invitations
+  - Brazilian Portuguese content with professional branding
+- **Granular Permission System**: 
+  - **4 Main Sections**: Registration, Records, Breedings, Finances
+  - **4 Action Types**: View, Add, Edit, Remove permissions per resource
+  - **16 Resource Types**: Properties, locations, animals, employees, suppliers, buyers, births, acquisitions, weighings, sales, sanitary control, breedings, reproductive indexes, cash flow, accounts, and bank accounts
+  - **64 Individual Permissions**: Complete granular control over user access
+- **Role-based Access Control (RBAC)**: 
+  - Main users bypass all permission checks with full system access
+  - Team members restricted by assigned permissions
+  - Permission inheritance and delegation capabilities
+- **Account Lifecycle Management**: 
+  - User status tracking: Pending, Active, Inactive states
+  - Account activation workflows and email verification requirements
+  - User deactivation and reactivation processes
+- **Intelligent Trial System**: 
+  - Automatic 14-day trial periods for new companies
+  - Trial status tracking: Active, Expired, Converted states
+  - Seamless trial-to-paid subscription conversion
+
+### 🏗️ Enterprise API Architecture
+- **RESTful API Design**: 
+  - Comprehensive OpenAPI/Swagger 3.0 documentation with interactive testing
+  - Standardized HTTP status codes and response formats
+  - Consistent API versioning and backward compatibility
+  - Resource-based URL structure following REST principles
+- **Advanced Input Validation**: 
+  - Global validation pipes with class-validator decorators
+  - Automatic payload transformation and sanitization
+  - Custom validation rules for Brazilian business data (CNPJ, CPF)
+  - Comprehensive error messages with field-level validation feedback
+- **Robust Error Handling**: 
+  - Structured exception handling with custom exception filters
+  - Detailed error logging with request correlation IDs
+  - User-friendly error messages with internationalization support
+  - Automatic error reporting and alerting for production issues
+- **Configuration Management**: 
+  - Environment-based configuration with validation
+  - Secure secrets management and environment variable validation
+  - Feature flags and runtime configuration updates
+  - Multi-environment support (development, staging, production)
+
+### 💼 Business Logic Modules
+- **Comprehensive Plans Management**: 
+  - Four-tier pricing structure (Mínimo, Básico, Padrão, Avançado)
+  - Feature-based plan limitations and access control
+  - Dynamic pricing with monthly and annual billing options
+  - Plan popularity indicators and promotional features
+- **Advanced Subscription Management**: 
+  - Complete subscription lifecycle from trial to paid plans
+  - Automatic billing cycle management (monthly/annual)
+  - Subscription status tracking and renewal notifications
+  - Upgrade/downgrade workflows with prorated billing
+- **Integrated Payment Management**: 
+  - Multi-payment method support (credit card, PIX, bank transfer, boleto)
+  - Payment status tracking and transaction history
+  - Automated payment retry logic and failure handling
+  - Financial reporting and revenue analytics
+- **Intelligent Trial System**: 
+  - Automatic 14-day trial activation for new companies
+  - Trial usage tracking and limitation enforcement
+  - Trial conversion optimization and reminder notifications
+  - Grace period management and trial extension capabilities
+- **Advanced User Management**: 
+  - Team member invitation and onboarding workflows
+  - Granular permission assignment and management
+  - User profile management with Brazilian compliance
+  - Activity logging and audit trails for user actions
+- **Company Profile Management**: 
+  - Complete company profile with Brazilian business data
+  - Address management with geocoding integration
+  - Company settings and preferences management
+  - Multi-property support for large agricultural operations
+
+### 🛡️ Enterprise Security Features
+- **Comprehensive Security Headers**: 
+  - Helmet integration for complete HTTP security header management
+  - Content Security Policy (CSP) with strict directives
+  - HTTP Strict Transport Security (HSTS) with long-term caching
+  - X-Frame-Options for clickjacking protection
+  - X-Content-Type-Options for MIME sniffing protection
+  - Referrer Policy for privacy protection
+- **Advanced CORS Protection**: 
+  - Configurable cross-origin resource sharing policies
+  - Environment-specific origin allowlists
+  - Credential handling and preflight request management
+  - Dynamic CORS configuration for multi-domain deployments
+- **Intelligent Rate Limiting**: 
+  - Per-IP request throttling with configurable limits
+  - Different rate limits for development (100 req/min) and production (50 req/min)
+  - Authentication endpoint specific throttling
+  - Distributed rate limiting for multi-instance deployments
+- **Multi-Layer Input Validation**: 
+  - Automatic payload validation with class-validator
+  - SQL injection prevention with parameterized queries
+  - XSS protection with input sanitization
+  - File upload validation and virus scanning
+  - Request size limits and timeout protection
+- **Advanced Password Security**: 
+  - bcrypt hashing with configurable salt rounds (minimum 12)
+  - Password strength requirements and complexity validation
+  - Password history tracking to prevent reuse
+  - Secure password reset with time-limited tokens
+- **Enterprise JWT Security**: 
+  - Secure token generation with cryptographically strong secrets
+  - Configurable token expiry (7-day access, 30-day refresh)
+  - Token blacklisting and revocation capabilities
+  - Automatic token rotation and refresh workflows
+- **Real-time Security Monitoring**: 
+  - Automated detection of SQL injection attempts
+  - XSS attack pattern recognition and blocking
+  - Path traversal attempt detection and logging
+  - Brute force attack detection and IP blocking
+  - Suspicious user agent and bot detection
+- **Advanced Request Fingerprinting**: 
+  - Detailed logging of suspicious activities with correlation IDs
+  - IP geolocation tracking for security analysis
+  - Request pattern analysis and anomaly detection
+  - Security event aggregation and alerting
+- **Multi-Layer Authentication Guards**: 
+  - JWT token validation with signature verification
+  - Permission-based route protection with granular access control
+  - Role-based access control (RBAC) enforcement
+  - API key authentication for service-to-service communication
+
+### 📊 Advanced Monitoring & Observability
+- **Comprehensive Health Checks**: 
+  - Application health status endpoints with detailed diagnostics
+  - Database connectivity and performance monitoring
+  - External service dependency health checks
+  - Readiness and liveness probes for Kubernetes deployments
+- **Enterprise Metrics Collection**: 
+  - Prometheus client integration for metrics collection and exposure
+  - Custom business metrics (user registrations, subscriptions, payments)
+  - Performance metrics (response times, throughput, error rates)
+  - Resource utilization metrics (CPU, memory, database connections)
+- **Advanced Logging System**: 
+  - Structured JSON logging with configurable detail levels
+  - Daily log rotation with automatic cleanup and archiving
+  - Centralized logging with correlation IDs for request tracing
+  - Log aggregation support for ELK stack and cloud logging services
+- **Real-time Performance Monitoring**: 
+  - Application performance monitoring (APM) integration
+  - Database query performance tracking and optimization alerts
+  - Memory leak detection and garbage collection monitoring
+  - API endpoint performance profiling and bottleneck identification
+
+### 📝 Enterprise Logging System
+- **Structured Logging Architecture**: 
+  - Daily rotated log files organized by severity level (error, warn, info, debug)
+  - JSON-formatted logs for easy parsing and analysis
+  - Automatic log cleanup and archival policies
+  - Configurable log retention periods for compliance
+- **Security Event Tracking**: 
+  - Comprehensive security event logging and real-time alerting
+  - Authentication attempt tracking (successful and failed logins)
+  - Permission violation logging and access control auditing
+  - Suspicious activity detection and automated response
+- **Request/Response Logging**: 
+  - Configurable detail levels for request/response logging
+  - Sensitive data masking and PII protection
+  - Performance metrics logging (response times, payload sizes)
+  - API usage analytics and rate limiting enforcement
+- **Advanced Error Tracking**: 
+  - Detailed error stack traces with context information
+  - Error categorization and automatic bug reporting
+  - Performance bottleneck identification and optimization suggestions
+  - Integration with error monitoring services (Sentry, Bugsnag)
+- **Audit Trail Management**: 
+  - Complete audit trails for all user actions and system changes
+  - Compliance logging for regulatory requirements
+  - Data modification tracking with before/after snapshots
+  - User activity timelines and behavioral analysis
+
+### 🗄️ Advanced Database & ORM Architecture
+- **Enterprise PostgreSQL Integration**: 
+  - PostgreSQL 15+ with full ACID compliance and advanced features
+  - High-performance database configuration with optimized settings
+  - Database clustering and replication support for high availability
+  - Automated backup and disaster recovery procedures
+- **Type-Safe Prisma ORM**: 
+  - Prisma 5.22.0 with auto-generated TypeScript types
+  - Zero-runtime overhead with compile-time type checking
+  - Advanced query optimization and performance monitoring
+  - Database introspection and schema validation
+- **Robust Migration System**: 
+  - Version-controlled schema changes with rollback capabilities
+  - Automated migration deployment and validation
+  - Schema diff generation and conflict resolution
+  - Production-safe migration strategies with zero-downtime deployments
+- **Comprehensive Database Seeding**: 
+  - Automated initial data population with realistic test data
+  - Four-tier pricing plan seeding with Brazilian market pricing
+  - Development and production seed data management
+  - Data consistency validation and integrity checks
+- **Optimized Connection Management**: 
+  - Intelligent connection pooling with configurable pool sizes
+  - Connection health monitoring and automatic recovery
+  - Database load balancing and read replica support
+  - Connection leak detection and prevention
+- **Complete Type Safety**: 
+  - Full TypeScript integration with database operations
+  - Compile-time query validation and type checking
+  - Auto-completion and IntelliSense for database queries
+  - Runtime type validation for data integrity
+- **Complex Relational Data Model**: 
+  - **User Management**: Users, companies, authentication tokens, permissions
+  - **Subscription System**: Plans, subscriptions, payments, trial tracking
+  - **Business Logic**: Multi-tenant data isolation and access control
+  - **Audit Trails**: Change tracking and data lineage management
+- **Intelligent Trial Management**: 
+  - Built-in trial period tracking with automatic expiry handling
+  - Trial usage analytics and conversion optimization
+  - Flexible trial extension and conversion workflows
+  - Trial abuse prevention and fraud detection
+
+## 📋 Prerequisites
+
+### Required Software
+- **Node.js**: Version 18.x or higher (LTS recommended)
+- **npm**: Version 8.x or higher (comes with Node.js)
+- **PostgreSQL**: Version 15.x or higher
+- **Git**: For version control and repository management
+
+### Optional but Recommended
+- **Docker & Docker Compose**: For containerized development environment
+- **VS Code**: With recommended extensions for optimal development experience
+- **Postman or Insomnia**: For API testing and development
+- **pgAdmin or DBeaver**: For database management and visualization
+
+### Development Environment Setup
+- **Operating System**: Linux, macOS, or Windows with WSL2
+- **Memory**: Minimum 4GB RAM (8GB recommended for optimal performance)
+- **Storage**: At least 2GB free space for dependencies and database
 
 ## Installation
 
