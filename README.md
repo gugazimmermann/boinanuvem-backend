@@ -9,6 +9,7 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - **Runtime**: Node.js
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: JWT with refresh tokens, bcrypt password hashing
+- **Email Service**: Nodemailer with Gmail SMTP integration
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation, Throttling
 - **Monitoring**: Health checks, Prometheus metrics, Structured logging
 - **Testing**: Jest (Unit, Integration & E2E tests) - 84 tests total
@@ -24,6 +25,7 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - **JWT Authentication**: Access tokens (7-day expiry) and refresh tokens (30-day expiry)
 - **Email Verification**: Required for account activation and email changes
 - **Password Management**: Secure password reset with email verification
+- **Email Integration**: Professional HTML emails via Gmail SMTP (verification, password reset, welcome, invitations)
 - **Granular Permissions**: 4 sections (Registration, Records, Breedings, Finances) × 4 actions (view, add, edit, remove)
 - **Role-based Access Control**: Main users have full access, team members have configurable permissions
 - **Account Status Management**: Pending, active, inactive user states
@@ -108,6 +110,8 @@ cp env.template .env
 # - DATABASE_URL: PostgreSQL connection string
 # - JWT_SECRET: Secret key for JWT token signing
 # - FRONTEND_URL: Frontend application URL for email links
+# - GMAIL_EMAIL: Gmail account for sending emails
+# - GMAIL_PASSWORD: Gmail app password for SMTP authentication
 # - CORS_ORIGIN: Allowed origins for CORS
 # - Security settings: Rate limiting, request timeouts
 # - Application settings: Port, API prefix, Swagger
@@ -127,6 +131,76 @@ npx prisma migrate deploy
 # Seed the database with initial data (pricing plans)
 npx prisma db seed
 ```
+
+## Email Configuration
+
+The application uses **Nodemailer** with Gmail SMTP to send transactional emails. This replaces the previous mock email service with real email functionality.
+
+### Email Types
+The system sends four types of professional HTML emails:
+
+1. **Email Verification**: Sent during user registration and email changes
+2. **Password Reset**: Sent when users request password reset
+3. **Welcome Email**: Sent after successful account verification
+4. **Team Member Invitation**: Sent when main users invite team members
+
+### Gmail SMTP Setup
+
+#### Prerequisites
+- Gmail account for sending emails
+- Gmail App Password (not your regular Gmail password)
+
+#### Creating Gmail App Password
+1. Enable 2-Factor Authentication on your Gmail account
+2. Go to Google Account Settings → Security → 2-Step Verification
+3. Generate an "App Password" for "Mail"
+4. Use this 16-character app password in your environment variables
+
+#### Environment Variables
+```bash
+# Gmail SMTP Configuration
+GMAIL_EMAIL=your-gmail-account@gmail.com
+GMAIL_PASSWORD=your-16-character-app-password
+
+# Frontend URL for email links
+FRONTEND_URL=http://localhost:3000
+```
+
+#### Email Templates
+All emails feature:
+- Professional HTML design with Boi na Nuvem branding
+- Responsive layout for mobile and desktop
+- Portuguese language content for Brazilian users
+- Fallback text versions for email clients without HTML support
+- Security notices and professional messaging
+
+#### Production Considerations
+- Use a dedicated Gmail account for production emails
+- Consider using Gmail Workspace for better deliverability
+- Monitor email sending limits (Gmail: 500 emails/day for free accounts)
+- Set up proper SPF, DKIM, and DMARC records for your domain
+- For high-volume applications, consider upgrading to services like SendGrid or AWS SES
+
+#### Troubleshooting Email Issues
+
+**Common Issues:**
+1. **"Invalid login" errors**: Ensure you're using an App Password, not your regular Gmail password
+2. **"Less secure app access" errors**: App Passwords bypass this requirement
+3. **Emails not being sent**: Check Gmail account limits and verify SMTP credentials
+4. **Emails going to spam**: Set up proper domain authentication (SPF, DKIM, DMARC)
+
+**Testing Email Configuration:**
+```bash
+# Test email sending in development
+npm run start:dev
+
+# Register a test user and check for verification email
+# Check application logs for email sending confirmations
+```
+
+**Email Service Logs:**
+- Successful sends: `Email sent successfully to user@example.com. Message ID: <message-id>`
+- Failed sends: `Failed to send email to user@example.com: <error-details>`
 
 ## Development
 
@@ -388,6 +462,10 @@ DATABASE_URL="postgresql://username:password@localhost:5432/boinanuvem"
 JWT_SECRET="your-super-secure-jwt-secret-key"
 FRONTEND_URL="https://yourdomain.com"
 
+# Email Configuration
+GMAIL_EMAIL="your-production-email@gmail.com"
+GMAIL_PASSWORD="your-gmail-app-password"
+
 # Security
 CORS_ORIGIN=https://yourdomain.com
 RATE_LIMIT_TTL=60000
@@ -417,7 +495,8 @@ API_PREFIX=api/v1
 - Set up security monitoring alerts
 - Run database migrations: `npx prisma migrate deploy`
 - Ensure database connection pooling is properly configured
-- Set up email service integration (replace mock email service)
+- Configure Gmail SMTP with proper app password
+- Set up email monitoring and deliverability tracking
 
 ## Project Structure
 
@@ -441,8 +520,8 @@ src/
 │   ├── users.controller.ts
 │   ├── users.service.ts
 │   └── users.module.ts
-├── email/                 # Email service module (mocked)
-│   ├── email.service.ts  # Email sending service
+├── email/                 # Email service module
+│   ├── email.service.ts  # Nodemailer Gmail SMTP service
 │   └── email.module.ts   # Email module configuration
 ├── common/                # Shared utilities and configurations
 │   ├── config/           # Environment and security configuration
@@ -585,8 +664,8 @@ curl -X POST http://localhost:3000/api/auth/register/company \
     "userPassword": "password123"
   }'
 
-# Note: In development, check logs for email verification token
-# Verify email, then login to get JWT tokens
+# Note: Check your Gmail account for the verification email
+# Click the verification link, then login to get JWT tokens
 ```
 
 ## Contributing & Development

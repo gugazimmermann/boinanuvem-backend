@@ -79,6 +79,18 @@ export class EnvironmentVariables {
 
   @IsString()
   DATABASE_URL!: string;
+
+  @IsString()
+  JWT_SECRET!: string;
+
+  @IsString()
+  FRONTEND_URL!: string;
+
+  @IsString()
+  GMAIL_EMAIL!: string;
+
+  @IsString()
+  GMAIL_PASSWORD!: string;
 }
 
 export function validate(config: Record<string, unknown>) {
