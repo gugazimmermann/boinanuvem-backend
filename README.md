@@ -1,6 +1,6 @@
 # Boinanuvem Backend
 
-A secure and scalable NestJS backend API built with TypeScript for the Boinanuvem cattle management platform. Features comprehensive authentication system, security measures, health monitoring, metrics collection, PostgreSQL database with Prisma ORM, and complete pricing plans management.
+A secure and scalable NestJS backend API built with TypeScript for the Boinanuvem cattle management platform. Features comprehensive authentication system, subscription management with 14-day trials, payment processing, security measures, health monitoring, metrics collection, PostgreSQL database with Prisma ORM, and complete pricing plans management.
 
 ## Technology Stack
 
@@ -12,7 +12,7 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - **Email Service**: Nodemailer with Gmail SMTP integration
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation, Throttling
 - **Monitoring**: Health checks, Prometheus metrics, Structured logging
-- **Testing**: Jest (Unit, Integration & E2E tests) - 84 tests total
+- **Testing**: Jest (Unit, Integration & E2E tests) - 197 tests total
 - **Code Quality**: ESLint, Prettier, Husky pre-commit hooks
 - **Documentation**: Swagger/OpenAPI with authentication support
 - **Containerization**: Docker & Docker Compose
@@ -21,7 +21,7 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 
 ### Authentication & Authorization System
 - **Two-tier User System**: Main users (company owners) and regular team members
-- **Company Registration**: Complete company onboarding with main user creation
+- **Company Registration**: Complete company onboarding with main user creation and automatic trial activation
 - **JWT Authentication**: Access tokens (7-day expiry) and refresh tokens (30-day expiry)
 - **Email Verification**: Required for account activation and email changes
 - **Password Management**: Secure password reset with email verification
@@ -29,6 +29,7 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - **Granular Permissions**: 4 sections (Registration, Records, Breedings, Finances) × 4 actions (view, add, edit, remove)
 - **Role-based Access Control**: Main users have full access, team members have configurable permissions
 - **Account Status Management**: Pending, active, inactive user states
+- **Trial System**: Automatic 14-day trial periods for new companies with status tracking
 
 ### Core API Functionality
 - RESTful API endpoints with comprehensive OpenAPI/Swagger documentation
@@ -36,6 +37,9 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - Structured error handling and logging
 - Environment-based configuration management
 - **Plans Management**: Complete pricing plans API for subscription management
+- **Subscription Management**: Full subscription lifecycle management with trial periods
+- **Payment Management**: Payment tracking, billing, and transaction management
+- **Trial System**: 14-day trial periods with automatic management and status tracking
 - **User Management**: Team member creation, permission management, profile updates
 - **Company Management**: Company profile management and settings
 
@@ -70,7 +74,8 @@ A secure and scalable NestJS backend API built with TypeScript for the Boinanuve
 - **Database Seeding**: Automated initial data population with pricing plans
 - **Connection Pooling**: Efficient database connection management
 - **Type Safety**: Full TypeScript integration with database operations
-- **Complex Relations**: Users, companies, authentication tokens, permissions
+- **Complex Relations**: Users, companies, authentication tokens, permissions, subscriptions, payments
+- **Trial Management**: Built-in trial period tracking and automatic expiry handling
 
 ## Prerequisites
 
@@ -327,6 +332,52 @@ The documentation includes:
   - Query parameters:
     - `status`: Filter by plan status (`active`, `inactive`, `all`) - defaults to `active`
 
+#### Subscription Management
+- `GET /subscriptions/company/:companyId` - Get company subscriptions (authenticated)
+- `GET /subscriptions/company/:companyId/current` - Get current active subscription
+- `POST /subscriptions` - Create new subscription (main user only)
+- `PUT /subscriptions/:id` - Update subscription (main user only)
+- `DELETE /subscriptions/:id` - Cancel subscription (main user only)
+
+#### Payment Management
+- `GET /payments/company/:companyId` - Get company payment history (authenticated)
+- `GET /payments/:id` - Get specific payment details (authenticated)
+- `POST /payments` - Create payment record (main user only)
+- `PUT /payments/:id` - Update payment status (main user only)
+
+## Trial System
+
+### Overview
+The Boinanuvem platform includes a comprehensive trial system that provides new companies with a 14-day free trial period to evaluate the platform before committing to a paid subscription.
+
+### Trial Features
+- **Automatic Trial Activation**: New companies automatically receive a 14-day trial upon registration
+- **Trial Status Tracking**: Real-time monitoring of trial status (active, expired, converted)
+- **Trial Information API**: Endpoints to check remaining trial days and status
+- **Seamless Conversion**: Easy upgrade from trial to paid subscription
+- **Grace Period Handling**: Proper handling of trial expiry and account limitations
+
+### Trial Service
+The `TrialService` provides comprehensive trial management functionality:
+
+#### Trial Calculation
+- Calculates remaining trial days based on company creation date
+- Determines trial status (active, expired, converted)
+- Handles companies with existing paid subscriptions
+- Provides trial information for frontend display
+
+#### Trial Status Types
+- **active**: Trial is currently active with remaining days
+- **expired**: Trial period has ended without conversion
+- **converted**: Company has upgraded to a paid subscription
+- **null**: No trial information available
+
+### Trial Integration
+- **Company Registration**: Trials are automatically created during company registration
+- **Subscription Management**: Trial status affects subscription creation and management
+- **Access Control**: Trial status can be used to limit feature access
+- **Payment Processing**: Trial conversion triggers payment processing workflows
+
 ## Authentication & Authorization
 
 ### JWT Token System
@@ -405,12 +456,13 @@ Security events are logged to `logs/security-*.log` and alerts to `logs/error-*.
 
 ## Testing Strategy
 
-The application has comprehensive test coverage with **84 tests** across multiple test types:
+The application has comprehensive test coverage with **197 tests** across multiple test types:
 
 ### Test Coverage Summary
-- **Unit Tests**: 50 tests covering services, controllers, and guards
+- **Unit Tests**: 152 tests covering services, controllers, and guards
 - **Integration Tests**: 7 tests for database operations and business logic
-- **E2E Tests**: 27 tests for complete API endpoint workflows
+- **E2E Tests**: 33 tests for complete API endpoint workflows
+- **Skipped Tests**: 3 tests (conditional or environment-specific)
 
 ### Test Categories
 - **Authentication Tests**: Login, registration, token management, password operations
@@ -418,6 +470,9 @@ The application has comprehensive test coverage with **84 tests** across multipl
 - **User Management Tests**: Profile management, team member operations
 - **Email Service Tests**: Verification emails, password reset emails, welcome emails
 - **Plans Service Tests**: Pricing plan retrieval and filtering
+- **Subscription Tests**: Subscription lifecycle, trial management, and billing cycles
+- **Payment Tests**: Payment processing, status tracking, and transaction management
+- **Trial System Tests**: Trial period calculations, expiry handling, and status management
 - **Security Tests**: Rate limiting, input validation, CORS protection
 
 ### Running Tests
@@ -529,7 +584,7 @@ src/
 │   ├── guards/           # Security guards and middleware
 │   ├── interceptors/     # Request/response interceptors
 │   ├── logger/           # Custom logging service
-│   └── services/         # Shared services (Prisma, etc.)
+│   └── services/         # Shared services (Prisma, Trial service, etc.)
 ├── health/               # Health check module
 ├── metrics/              # Prometheus metrics module
 ├── plans/                # Pricing plans management module
@@ -537,6 +592,12 @@ src/
 │   ├── plans.controller.ts
 │   ├── plans.service.ts
 │   └── plans.module.ts
+├── subscriptions/        # Subscription management module
+│   ├── subscriptions.service.ts # Subscription lifecycle management
+│   └── subscriptions.service.spec.ts # Subscription tests
+├── payments/             # Payment management module
+│   ├── payments.service.ts # Payment processing and tracking
+│   └── payments.service.spec.ts # Payment tests
 ├── app.controller.ts     # Main application controller
 ├── app.module.ts         # Root application module
 ├── app.service.ts        # Main application service
@@ -567,11 +628,14 @@ The application uses PostgreSQL with Prisma ORM. The schema includes:
 #### Companies
 - **id**: Unique identifier (CUID)
 - **cnpj**: Brazilian company registration number
-- **name**: Company name
+- **companyName**: Company name
 - **email**: Company contact email
 - **phone**: Company phone number
-- **address**: Complete address information
-- **planId**: Reference to subscribed plan (optional)
+- **address**: Complete address information (street, number, complement, neighborhood, city, state, zipCode)
+- **coordinates**: Optional latitude/longitude for location services
+- **status**: Company status (active, inactive)
+- **trialStartDate/trialEndDate**: Trial period tracking
+- **trialStatus**: Trial status (active, expired, converted)
 - **createdAt/updatedAt**: Timestamps
 
 #### Users
@@ -581,19 +645,32 @@ The application uses PostgreSQL with Prisma ORM. The schema includes:
 - **phone**: User phone number
 - **cpf**: Brazilian individual registration number (optional)
 - **password**: Hashed password (bcrypt)
+- **address**: Optional complete address information
 - **companyId**: Reference to company
 - **mainUser**: Boolean flag for company owner
 - **status**: User status (pending, active, inactive)
-- **emailVerified**: Boolean flag for email verification
-- **emailVerifiedAt**: Timestamp of email verification
+- **emailVerifiedAt**: Timestamp of email verification (nullable)
 - **permissions**: JSON object with granular permissions
 - **lastAccess**: Last login timestamp
 - **createdAt/updatedAt**: Timestamps
 
 #### Authentication Tokens
-- **RefreshToken**: JWT refresh tokens with expiry
-- **EmailVerification**: Email verification tokens
-- **PasswordReset**: Password reset tokens
+- **RefreshToken**: JWT refresh tokens with expiry and user association
+- **EmailVerification**: Email verification tokens with usage tracking
+- **PasswordReset**: Password reset tokens with usage tracking
+
+#### Subscription Management Tables
+- **CompanySubscription**: Subscription records linking companies to plans
+  - Subscription status (active, cancelled, expired, trial)
+  - Billing cycle (monthly, annual)
+  - Trial period tracking
+  - Start and end dates
+- **CompanyPayment**: Payment transaction records
+  - Payment amounts and currency (BRL)
+  - Payment status (pending, paid, failed, refunded, cancelled)
+  - Payment methods (credit_card, pix, bank_transfer, boleto)
+  - External payment gateway integration
+  - Due dates and payment dates
 
 ### Plans Table
 Stores pricing plan information for the Boinanuvem platform:
@@ -666,6 +743,7 @@ curl -X POST http://localhost:3000/api/auth/register/company \
 
 # Note: Check your Gmail account for the verification email
 # Click the verification link, then login to get JWT tokens
+# The company will automatically receive a 14-day trial period
 ```
 
 ## Contributing & Development
