@@ -74,19 +74,40 @@ async function bootstrap() {
 
   const port = (configService.get('PORT') as number) ?? 3000;
 
-  const environment =
+  const environment: string =
     (configService.get('NODE_ENV') as string) || 'development';
-  const enableSwagger =
-    (configService.get('ENABLE_SWAGGER') as boolean) &&
-    environment !== 'production';
+  const swaggerConfig = configService.get('ENABLE_SWAGGER') as string;
+  // Force enable Swagger in development for now
+  const enableSwagger = environment === 'development';
+
+  logger.log(
+    `Swagger config: ${swaggerConfig} (type: ${typeof swaggerConfig}), Environment: ${environment}, Enable: ${enableSwagger}`,
+  );
 
   if (enableSwagger) {
     const config = new DocumentBuilder()
       .setTitle('Boinanuvem Backend API')
       .setDescription(
-        'API documentation for Boinanuvem backend service with health checks and metrics',
+        'Complete API documentation for Boinanuvem backend service including authentication, user management, and business features',
       )
       .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addTag(
+        'Authentication',
+        'User authentication and authorization endpoints',
+      )
+      .addTag('Companies', 'Company registration and management')
+      .addTag('Users', 'User management and team member operations')
       .addTag('app', 'Main application endpoints')
       .addTag('health', 'Health check endpoints')
       .addTag('metrics', 'Prometheus metrics endpoints')
@@ -107,10 +128,8 @@ async function bootstrap() {
       },
       customSiteTitle: 'Boinanuvem API Documentation',
       customfavIcon: '/favicon.ico',
-      ...(environment === 'production' && {
-        customJs: ['/swagger-security.js'],
-      }),
-      explorer: environment !== 'production',
+      // Production-specific configuration would go here
+      explorer: true,
     });
 
     logger.log(

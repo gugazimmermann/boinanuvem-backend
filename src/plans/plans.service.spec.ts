@@ -103,9 +103,9 @@ describe('PlansService', () => {
       expect(mockPrismaClient.plan.findMany).toHaveBeenCalledWith({
         where: { status: 'active' },
       });
-      // Should be sorted by price (Básico R$ 99,00 before Padrão R$ 149,90)
-      expect(result[0].name).toBe('Básico');
-      expect(result[1].name).toBe('Padrão');
+      // Should be sorted by popularity first, then alphabetically (Padrão is popular, Básico is not)
+      expect(result[0].name).toBe('Padrão');
+      expect(result[1].name).toBe('Básico');
     });
 
     it('should return inactive plans when status is inactive', async () => {
@@ -132,10 +132,10 @@ describe('PlansService', () => {
       expect(mockPrismaClient.plan.findMany).toHaveBeenCalledWith({
         where: {},
       });
-      // Should be sorted by price: Deprecated Plan (R$ 50,00), Básico (R$ 99,00), Padrão (R$ 149,90)
-      expect(result[0].name).toBe('Deprecated Plan');
+      // Should be sorted by popularity first, then alphabetically: Padrão (popular), then Básico, Deprecated Plan (alphabetical)
+      expect(result[0].name).toBe('Padrão');
       expect(result[1].name).toBe('Básico');
-      expect(result[2].name).toBe('Padrão');
+      expect(result[2].name).toBe('Deprecated Plan');
     });
 
     it('should handle undefined status as active', async () => {
@@ -148,12 +148,12 @@ describe('PlansService', () => {
       expect(mockPrismaClient.plan.findMany).toHaveBeenCalledWith({
         where: { status: 'active' },
       });
-      // Should be sorted by price (Básico R$ 99,00 before Padrão R$ 149,90)
-      expect(result[0].name).toBe('Básico');
-      expect(result[1].name).toBe('Padrão');
+      // Should be sorted by popularity first, then alphabetically (Padrão is popular, Básico is not)
+      expect(result[0].name).toBe('Padrão');
+      expect(result[1].name).toBe('Básico');
     });
 
-    it('should order plans by price ascending', async () => {
+    it('should order plans by popularity first, then alphabetically', async () => {
       const query: GetPlansQueryDto = { status: 'all' };
       mockPrismaClient.plan.findMany.mockResolvedValue(mockPlans);
 
@@ -163,10 +163,10 @@ describe('PlansService', () => {
         where: {},
       });
 
-      // Verify plans are sorted by price: R$ 50,00, R$ 99,00, R$ 149,90
-      expect(result[0].monthlyPrice).toBe('R$ 50,00');
-      expect(result[1].monthlyPrice).toBe('R$ 99,00');
-      expect(result[2].monthlyPrice).toBe('R$ 149,90');
+      // Verify plans are sorted by popularity first, then alphabetically: Padrão (popular), Básico, Deprecated Plan
+      expect(result[0].name).toBe('Padrão'); // popular: true
+      expect(result[1].name).toBe('Básico'); // popular: false, alphabetically first
+      expect(result[2].name).toBe('Deprecated Plan'); // popular: false, alphabetically second
     });
 
     it('should return empty array when no plans found', async () => {
@@ -192,7 +192,7 @@ describe('PlansService', () => {
         'Fetching plans with status filter: active',
       );
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Found ${activePlans.length} plans, sorted by price`,
+        `Found ${activePlans.length} plans, sorted by popularity then alphabetically`,
       );
     });
 

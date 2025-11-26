@@ -15,26 +15,21 @@ export class PlansService {
       where: status === 'all' ? {} : { status },
     });
 
-    // Sort plans by monthly price (ascending)
+    // Sort plans by popular first, then alphabetically by name
     const sortedPlans = plans.sort((a, b) => {
-      // Extract numeric value from price strings like "R$ 99,00"
-      const priceA = this.extractPriceValue(a.monthlyPrice);
-      const priceB = this.extractPriceValue(b.monthlyPrice);
-      return priceA - priceB;
+      // First, sort by popular (popular plans come first)
+      if (a.popular !== b.popular) {
+        return b.popular ? 1 : -1; // popular plans (true) come first
+      }
+
+      // Then sort alphabetically by name
+      return a.name.localeCompare(b.name);
     });
 
-    this.logger.log(`Found ${plans.length} plans, sorted by price`);
+    this.logger.log(
+      `Found ${plans.length} plans, sorted by popularity then alphabetically`,
+    );
     return sortedPlans;
-  }
-
-  private extractPriceValue(priceString: string): number {
-    // Remove "R$", spaces, and convert comma to dot for decimal parsing
-    const numericString = priceString
-      .replace(/R\$\s*/g, '')
-      .replace(/\./g, '') // Remove thousands separator
-      .replace(/,/g, '.'); // Convert decimal separator
-
-    return parseFloat(numericString) || 0;
   }
 
   async onModuleDestroy() {

@@ -7,6 +7,10 @@ import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PlansModule } from './plans/plans.module';
+import { AuthModule } from './auth/auth.module';
+import { CompaniesModule } from './companies/companies.module';
+import { UsersModule } from './users/users.module';
+import { EmailModule } from './email/email.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -34,6 +38,10 @@ import securityConfig from './common/config/security.config';
     HealthModule,
     MetricsModule,
     PlansModule,
+    AuthModule,
+    CompaniesModule,
+    UsersModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [
