@@ -299,6 +299,7 @@ export class CompaniesService {
         sanitaryControls: { view: true, add: true, edit: true, remove: true },
         locationMovements: { view: true, add: true, edit: true, remove: true },
         animalMovements: { view: true, add: true, edit: true, remove: true },
+        inventoryMovements: { view: true, add: true, edit: true, remove: true },
       },
       breedings: {
         breedings: { view: true, add: true, edit: true, remove: true },
@@ -322,6 +323,13 @@ export class CompaniesService {
         accountsPayable: { view: true, add: true, edit: true, remove: true },
         accountsReceivable: { view: true, add: true, edit: true, remove: true },
         bankAccounts: { view: true, add: true, edit: true, remove: true },
+      },
+      reports: {
+        analytics: { view: true, add: true, edit: true, remove: true },
+        financialReports: { view: true, add: true, edit: true, remove: true },
+        animalReports: { view: true, add: true, edit: true, remove: true },
+        productionReports: { view: true, add: true, edit: true, remove: true },
+        inventoryReports: { view: true, add: true, edit: true, remove: true },
       },
     };
   }
