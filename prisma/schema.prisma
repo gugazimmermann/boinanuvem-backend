@@ -24,7 +24,7 @@ model Plan {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  companies    Company[]
+  subscriptions CompanySubscription[]
 
   @@map("plans")
 }
@@ -44,14 +44,17 @@ model Company {
   zipCode      String
   latitude     Float?
   longitude    Float?
-  planId       String?
   status       String   @default("active") // "active" or "inactive"
+  trialStartDate DateTime? // When trial period started
+  trialEndDate   DateTime? // When trial period ends
+  trialStatus    String?   @default("active") // "active", "expired", "converted"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
-  users        User[]
-  plan         Plan?    @relation(fields: [planId], references: [id])
+  users         User[]
+  subscriptions CompanySubscription[]
+  payments      CompanyPayment[]
 
   @@map("companies")
 }
@@ -132,4 +135,49 @@ model PasswordReset {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_resets")
+}
+
+model CompanySubscription {
+  id          String   @id @default(cuid())
+  companyId   String
+  planId      String
+  status      String   @default("active") // "active", "cancelled", "expired", "trial"
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  billingCycle String  @default("monthly") // "monthly", "annual"
+  isActive    Boolean  @default(true)
+  isTrial     Boolean  @default(false)
+  trialEndDate DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan        Plan     @relation(fields: [planId], references: [id])
+  payments    CompanyPayment[]
+
+  @@map("company_subscriptions")
+}
+
+model CompanyPayment {
+  id             String   @id @default(cuid())
+  companyId      String
+  subscriptionId String?
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @default("BRL")
+  status         String   @default("pending") // "pending", "paid", "failed", "refunded", "cancelled"
+  paymentMethod  String?  // "credit_card", "pix", "bank_transfer", "boleto"
+  paymentDate    DateTime?
+  dueDate        DateTime
+  description    String?
+  externalId     String?  // External payment gateway ID
+  metadata       Json?    // Additional payment metadata
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscription   CompanySubscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@map("company_payments")
 }

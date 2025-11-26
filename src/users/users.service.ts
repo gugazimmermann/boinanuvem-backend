@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { TrialService } from '../common/services/trial.service';
 import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../email/email.service';
@@ -16,13 +17,25 @@ export class UsersService {
     private prisma: PrismaService,
     private authService: AuthService,
     private emailService: EmailService,
+    private trialService: TrialService,
   ) {}
 
-  async getCurrentUser(userId: string) {
+  async getCurrentUser(userId: string): Promise<unknown> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        company: true,
+        company: {
+          include: {
+            subscriptions: {
+              include: {
+                plan: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
       },
     });
 
@@ -30,7 +43,15 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    // Enhance company data with trial information
+    const enhancedCompany = await this.enhanceCompanyWithTrialInfo(
+      user.company,
+    );
+
+    return {
+      ...user,
+      company: enhancedCompany,
+    };
   }
 
   async updateCurrentUser(userId: string, updateUserDto: UpdateUserDto) {
@@ -495,6 +516,76 @@ export class UsersService {
         },
         bankAccounts: { view: false, add: false, edit: false, remove: false },
       },
+    };
+  }
+
+  /**
+   * Enhance company data with trial information and plan details
+   */
+  private async enhanceCompanyWithTrialInfo(
+    company: unknown,
+  ): Promise<unknown> {
+    if (!company) {
+      return company;
+    }
+
+    const companyData = company as Record<string, unknown>;
+    const subscriptions = companyData.subscriptions as unknown[] | undefined;
+
+    // Get current active subscription
+    const activeSubscription = subscriptions?.find((sub: unknown) => {
+      const subscription = sub as Record<string, unknown>;
+      return (
+        subscription.isActive &&
+        (subscription.status === 'active' || subscription.status === 'trial')
+      );
+    });
+
+    // Calculate trial information
+    const trialInfo = this.trialService.calculateTrialInfo({
+      trialStartDate: companyData.trialStartDate as Date | null,
+      trialEndDate: companyData.trialEndDate as Date | null,
+      trialStatus: companyData.trialStatus as string | null,
+      createdAt: companyData.createdAt as Date,
+      subscriptions: subscriptions,
+    });
+
+    // Update trial status in database if needed
+    if (
+      this.trialService.shouldUpdateTrialStatus({
+        trialStatus: companyData.trialStatus as string | null,
+        trialEndDate: companyData.trialEndDate as Date | null,
+        createdAt: companyData.createdAt as Date,
+        subscriptions: subscriptions,
+      })
+    ) {
+      await this.prisma.company.update({
+        where: { id: companyData.id as string },
+        data: { trialStatus: 'expired' },
+      });
+
+      // Also update trial subscription status if it exists
+      const trialSubscription = subscriptions?.find((sub: unknown) => {
+        const subscription = sub as Record<string, unknown>;
+        return subscription.isTrial && subscription.isActive;
+      });
+      if (trialSubscription) {
+        const trialSub = trialSubscription as Record<string, unknown>;
+        await this.prisma.companySubscription.update({
+          where: { id: trialSub.id as string },
+          data: { status: 'expired', isActive: false },
+        });
+      }
+    }
+
+    const activeSubscriptionData = activeSubscription as
+      | Record<string, unknown>
+      | undefined;
+    return {
+      ...companyData,
+      trial: trialInfo,
+      currentPlan: activeSubscriptionData?.plan || null,
+      currentSubscription: activeSubscription || null,
     };
   }
 }

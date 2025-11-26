@@ -76,7 +76,10 @@ export class LoggingInterceptor implements NestInterceptor {
             timestamp: new Date().toISOString(),
           };
 
-          this.logger.error(`HTTP ${method} ${url} failed: ${errorMessage}`);
+          // Only log to console in non-test environments
+          if (process.env.NODE_ENV !== 'test') {
+            this.logger.error(`HTTP ${method} ${url} failed: ${errorMessage}`);
+          }
           this.fileLogger.error(errorLog, errorStack, 'HTTP');
         },
       }),

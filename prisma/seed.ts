@@ -92,6 +92,21 @@ const PRICING_PLANS = [
     popular: false,
     status: 'active',
   },
+  {
+    name: 'Legacy',
+    description: 'Plano descontinuado para testes.',
+    monthlyPrice: 'R$ 19,90',
+    annualPrice: 'R$ 199,00',
+    limits: {
+      properties: '1 Propriedade',
+      locations: '5 Localizações',
+      animals: '25 Animais',
+      members: '1 Membro',
+    },
+    features: ['Gestão de Animais', 'Controle de Localização'],
+    popular: false,
+    status: 'inactive',
+  },
 ] as const;
 
 async function main() {

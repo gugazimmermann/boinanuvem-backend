@@ -26,15 +26,95 @@ export function createTestPrismaClient(): PrismaClient {
  * Clean up test data from the database
  */
 export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
-  // Clean up plans created during testing
-  await prisma.plan.deleteMany({
-    where: {
-      OR: [
-        { name: { startsWith: 'Test Plan' } },
-        { name: { startsWith: 'E2E Test Plan' } },
-      ],
-    },
-  });
+  // Clean up in order due to foreign key constraints
+
+  // Clean up refresh tokens first (no foreign key constraints)
+  try {
+    await prisma.refreshToken.deleteMany({
+      where: {
+        user: {
+          OR: [
+            { email: { startsWith: 'test@' } },
+            { email: { startsWith: 'e2e@' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    console.log('RefreshToken table not found, skipping cleanup');
+  }
+
+  try {
+    await prisma.companyPayment.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { startsWith: 'Test Company' } },
+            { companyName: { startsWith: 'E2E Test Company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    // Ignore if table doesn't exist
+    console.log('CompanyPayment table not found, skipping cleanup');
+  }
+
+  try {
+    await prisma.companySubscription.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { startsWith: 'Test Company' } },
+            { companyName: { startsWith: 'E2E Test Company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    // Ignore if table doesn't exist
+    console.log('CompanySubscription table not found, skipping cleanup');
+  }
+
+  try {
+    await prisma.user.deleteMany({
+      where: {
+        OR: [
+          { email: { startsWith: 'test@' } },
+          { email: { startsWith: 'e2e@' } },
+        ],
+      },
+    });
+  } catch {
+    console.log('User table not found, skipping cleanup');
+  }
+
+  try {
+    await prisma.company.deleteMany({
+      where: {
+        OR: [
+          { companyName: { startsWith: 'Test Company' } },
+          { companyName: { startsWith: 'E2E Test Company' } },
+        ],
+      },
+    });
+  } catch {
+    console.log('Company table not found, skipping cleanup');
+  }
+
+  try {
+    // Clean up plans created during testing
+    await prisma.plan.deleteMany({
+      where: {
+        OR: [
+          { name: { startsWith: 'Test Plan' } },
+          { name: { startsWith: 'E2E Test Plan' } },
+        ],
+      },
+    });
+  } catch {
+    console.log('Plan table not found, skipping cleanup');
+  }
 }
 
 /**
@@ -176,6 +256,195 @@ export const mockPlanData = {
     updatedAt: new Date('2025-11-25T22:00:00.000Z'),
   },
 };
+
+/**
+ * Create test company with subscription
+ */
+export async function createTestCompany(
+  prisma: PrismaClient,
+  options: {
+    companyName?: string;
+    email?: string;
+    cnpj?: string;
+    planName?: string;
+    isTrial?: boolean;
+  } = {},
+): Promise<{
+  company: any;
+  user: any;
+  subscription: any;
+  plan: any;
+}> {
+  const {
+    companyName = 'Test Company Ltd',
+    email = 'test@company.com',
+    cnpj = '12.345.678/0001-90',
+    planName = 'Avançado',
+    isTrial = true,
+  } = options;
+
+  // Get or create plan
+  let plan = await prisma.plan.findUnique({
+    where: { name: planName },
+  });
+
+  if (!plan) {
+    plan = await prisma.plan.create({
+      data: {
+        name: planName,
+        description: `Test plan - ${planName}`,
+        monthlyPrice: 'R$ 149,90',
+        annualPrice: 'R$ 1.439,00',
+        limits: {
+          properties: 'Ilimitadas',
+          locations: 'Ilimitadas',
+          animals: 'Ilimitados',
+          members: 'Ilimitados',
+        },
+        features: ['All Features'],
+        popular: false,
+        status: 'active',
+      },
+    });
+  }
+
+  // Create company
+  const company = await prisma.company.create({
+    data: {
+      cnpj,
+      companyName,
+      email,
+      phone: '(47) 99999-9999',
+      street: 'Test Street',
+      number: '123',
+      neighborhood: 'Test Neighborhood',
+      city: 'Test City',
+      state: 'SC',
+      zipCode: '88303-030',
+      trialStartDate: new Date(),
+      trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      trialStatus: 'active',
+    },
+  });
+
+  // Create main user
+  const user = await prisma.user.create({
+    data: {
+      name: 'Test User',
+      email: `user@${email.split('@')[1]}`,
+      phone: '(47) 99999-8888',
+      password: '$2b$12$test.hash.password',
+      companyId: company.id,
+      mainUser: true,
+      status: 'active',
+      permissions: {
+        registration: {
+          property: { view: true, add: true, edit: true, remove: true },
+          location: { view: true, add: true, edit: true, remove: true },
+          employee: { view: true, add: true, edit: true, remove: true },
+          serviceProvider: { view: true, add: true, edit: true, remove: true },
+          supplier: { view: true, add: true, edit: true, remove: true },
+          buyer: { view: true, add: true, edit: true, remove: true },
+          inventory: { view: true, add: true, edit: true, remove: true },
+          animals: { view: true, add: true, edit: true, remove: true },
+        },
+        records: {
+          births: { view: true, add: true, edit: true, remove: true },
+          acquisitions: { view: true, add: true, edit: true, remove: true },
+          weighings: { view: true, add: true, edit: true, remove: true },
+          sales: { view: true, add: true, edit: true, remove: true },
+          deaths: { view: true, add: true, edit: true, remove: true },
+          sanitaryControls: { view: true, add: true, edit: true, remove: true },
+          locationMovements: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+          animalMovements: { view: true, add: true, edit: true, remove: true },
+        },
+        breedings: {
+          breedings: { view: true, add: true, edit: true, remove: true },
+          unconfirmedBreedings: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+          pregnantCows: { view: true, add: true, edit: true, remove: true },
+          reproductiveIndexes: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+          birthForecast: { view: true, add: true, edit: true, remove: true },
+        },
+        finances: {
+          cashFlow: { view: true, add: true, edit: true, remove: true },
+          accountsPayable: { view: true, add: true, edit: true, remove: true },
+          accountsReceivable: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+          bankAccounts: { view: true, add: true, edit: true, remove: true },
+        },
+      },
+    },
+  });
+
+  // Create subscription
+  const subscription = await prisma.companySubscription.create({
+    data: {
+      companyId: company.id,
+      planId: plan.id,
+      status: isTrial ? 'trial' : 'active',
+      billingCycle: 'monthly',
+      isActive: true,
+      isTrial,
+      trialEndDate: isTrial
+        ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        : null,
+    },
+  });
+
+  return { company, user, subscription, plan };
+}
+
+/**
+ * Create test payment
+ */
+export async function createTestPayment(
+  prisma: PrismaClient,
+  companyId: string,
+  subscriptionId?: string,
+  options: {
+    amount?: number;
+    status?: string;
+    dueDate?: Date;
+  } = {},
+): Promise<any> {
+  const {
+    amount = 149.9,
+    status = 'pending',
+    dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  } = options;
+
+  return prisma.companyPayment.create({
+    data: {
+      companyId,
+      subscriptionId: subscriptionId || null,
+      amount,
+      currency: 'BRL',
+      status,
+      paymentMethod: 'credit_card',
+      dueDate,
+      description: 'Test payment',
+    },
+  });
+}
 
 /**
  * Environment configuration for tests

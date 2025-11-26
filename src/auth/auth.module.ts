@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaService } from '../common/services/prisma.service';
+import { TrialService } from '../common/services/trial.service';
 import { EmailModule } from '../email/email.module';
 import { CompaniesService } from '../companies/companies.service';
 
@@ -29,7 +30,13 @@ import { CompaniesService } from '../companies/companies.service';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService, CompaniesService],
-  exports: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    PrismaService,
+    TrialService,
+    CompaniesService,
+  ],
+  exports: [AuthService, JwtStrategy, TrialService],
 })
 export class AuthModule {}

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { TrialService } from '../common/services/trial.service';
 import { EmailService } from '../email/email.service';
 
 describe('UsersService', () => {
@@ -19,6 +20,12 @@ describe('UsersService', () => {
   const mockAuthService = {
     hashPassword: jest.fn(),
     generateEmailVerificationToken: jest.fn(),
+    _enhanceCompanyWithTrialInfo: jest.fn(),
+  };
+
+  const mockTrialService = {
+    calculateTrialInfo: jest.fn(),
+    shouldUpdateTrialStatus: jest.fn(),
   };
 
   const mockEmailService = {
@@ -32,6 +39,7 @@ describe('UsersService', () => {
         UsersService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: TrialService, useValue: mockTrialService },
         { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
@@ -53,17 +61,54 @@ describe('UsersService', () => {
         id: 'user-1',
         email: 'test@example.com',
         name: 'Test User',
-        company: { id: 'company-1', name: 'Test Company' },
+        company: {
+          id: 'company-1',
+          name: 'Test Company',
+          subscriptions: [],
+        },
       };
 
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockTrialService.calculateTrialInfo.mockReturnValue({
+        isOnTrial: true,
+        isTrialExpired: false,
+        trialDaysRemaining: 14,
+        trialStatus: 'active',
+      });
+      mockTrialService.shouldUpdateTrialStatus.mockReturnValue(false);
 
       const result = await service.getCurrentUser('user-1');
 
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual({
+        ...mockUser,
+        company: {
+          ...mockUser.company,
+          trial: {
+            isOnTrial: true,
+            isTrialExpired: false,
+            trialDaysRemaining: 14,
+            trialStatus: 'active',
+          },
+          currentPlan: null,
+          currentSubscription: null,
+        },
+      });
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        include: { company: true },
+        include: {
+          company: {
+            include: {
+              subscriptions: {
+                include: {
+                  plan: true,
+                },
+                orderBy: {
+                  createdAt: 'desc',
+                },
+              },
+            },
+          },
+        },
       });
     });
 

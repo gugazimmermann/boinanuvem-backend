@@ -35,7 +35,9 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Register a new company with main user' })
   @ApiResponse({ status: 201, description: 'Company registered successfully' })
   @ApiResponse({ status: 409, description: 'Company or user already exists' })
-  async registerCompany(@Body() registerCompanyDto: RegisterCompanyDto) {
+  async registerCompany(
+    @Body() registerCompanyDto: RegisterCompanyDto,
+  ): Promise<unknown> {
     return this.companiesService.registerCompany(registerCompanyDto);
   }
 

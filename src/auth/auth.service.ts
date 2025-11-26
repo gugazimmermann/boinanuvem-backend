@@ -5,6 +5,17 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/services/prisma.service';
+import { TrialService } from '../common/services/trial.service';
+
+interface ValidatedUser {
+  id: string;
+  email: string;
+  name: string;
+  companyId: string;
+  mainUser: boolean;
+  permissions: unknown;
+  company: unknown;
+}
 import * as bcrypt from 'bcrypt';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -13,12 +24,29 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private trialService: TrialService,
   ) {}
 
-  async validateUser(email: string, password: string) {
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<ValidatedUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { company: true },
+      include: {
+        company: {
+          include: {
+            subscriptions: {
+              include: {
+                plan: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -44,18 +72,10 @@ export class AuthService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: userPassword, ...result } = user;
-    return result;
+    return result as ValidatedUser;
   }
 
-  async login(user: {
-    id: string;
-    email: string;
-    name: string;
-    companyId: string;
-    mainUser: boolean;
-    permissions: unknown;
-    company: unknown;
-  }) {
+  async login(user: ValidatedUser): Promise<unknown> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -69,6 +89,11 @@ export class AuthService {
 
     const refreshToken = await this.generateRefreshToken(user.id);
 
+    // Enhance company data with trial information
+    const enhancedCompany = (await this.enhanceCompanyWithTrialInfo(
+      user.company,
+    )) as Record<string, unknown>;
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -79,15 +104,32 @@ export class AuthService {
         mainUser: user.mainUser,
         companyId: user.companyId,
         permissions: user.permissions,
-        company: user.company,
+        company: enhancedCompany,
       },
     };
   }
 
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string): Promise<unknown> {
     const tokenRecord = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: { include: { company: true } } },
+      include: {
+        user: {
+          include: {
+            company: {
+              include: {
+                subscriptions: {
+                  include: {
+                    plan: true,
+                  },
+                  orderBy: {
+                    createdAt: 'desc',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!tokenRecord || tokenRecord.expiresAt < new Date()) {
@@ -119,6 +161,11 @@ export class AuthService {
       where: { id: tokenRecord.id },
     });
 
+    // Enhance company data with trial information
+    const enhancedCompany = (await this.enhanceCompanyWithTrialInfo(
+      tokenRecord.user.company,
+    )) as Record<string, unknown>;
+
     return {
       access_token: accessToken,
       refresh_token: newRefreshToken,
@@ -129,7 +176,7 @@ export class AuthService {
         mainUser: tokenRecord.user.mainUser,
         companyId: tokenRecord.user.companyId,
         permissions: tokenRecord.user.permissions,
-        company: tokenRecord.user.company,
+        company: enhancedCompany,
       },
     };
   }
@@ -152,7 +199,7 @@ export class AuthService {
 
   async generateRefreshToken(userId: string): Promise<string> {
     const token = this.jwtService.sign(
-      { sub: userId, type: 'refresh' },
+      { sub: userId, type: 'refresh', iat: Date.now() },
       { expiresIn: '30d' },
     );
 
@@ -337,5 +384,74 @@ export class AuthService {
     });
 
     return { message: 'Password changed successfully' };
+  }
+
+  /**
+   * Enhance company data with trial information and plan details
+   */
+  private async enhanceCompanyWithTrialInfo(
+    company: unknown,
+  ): Promise<unknown> {
+    if (!company) {
+      return company;
+    }
+
+    // Get current active subscription
+    const companyData = company as Record<string, unknown>;
+    const subscriptions = companyData.subscriptions as unknown[] | undefined;
+    const activeSubscription = subscriptions?.find((sub: unknown) => {
+      const subscription = sub as Record<string, unknown>;
+      return (
+        subscription.isActive &&
+        (subscription.status === 'active' || subscription.status === 'trial')
+      );
+    });
+
+    // Calculate trial information
+    const trialInfo = this.trialService.calculateTrialInfo({
+      trialStartDate: companyData.trialStartDate as Date | null,
+      trialEndDate: companyData.trialEndDate as Date | null,
+      trialStatus: companyData.trialStatus as string | null,
+      createdAt: companyData.createdAt as Date,
+      subscriptions: subscriptions,
+    });
+
+    // Update trial status in database if needed
+    if (
+      this.trialService.shouldUpdateTrialStatus({
+        trialStatus: companyData.trialStatus as string | null,
+        trialEndDate: companyData.trialEndDate as Date | null,
+        createdAt: companyData.createdAt as Date,
+        subscriptions: subscriptions,
+      })
+    ) {
+      await this.prisma.company.update({
+        where: { id: companyData.id as string },
+        data: { trialStatus: 'expired' },
+      });
+
+      // Also update trial subscription status if it exists
+      const trialSubscription = subscriptions?.find((sub: unknown) => {
+        const subscription = sub as Record<string, unknown>;
+        return subscription.isTrial && subscription.isActive;
+      });
+      if (trialSubscription) {
+        const trialSub = trialSubscription as Record<string, unknown>;
+        await this.prisma.companySubscription.update({
+          where: { id: trialSub.id as string },
+          data: { status: 'expired', isActive: false },
+        });
+      }
+    }
+
+    const activeSubscriptionData = activeSubscription as
+      | Record<string, unknown>
+      | undefined;
+    return {
+      ...companyData,
+      trial: trialInfo,
+      currentPlan: activeSubscriptionData?.plan || null,
+      currentSubscription: activeSubscription || null,
+    };
   }
 }

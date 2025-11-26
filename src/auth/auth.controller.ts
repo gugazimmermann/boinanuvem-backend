@@ -64,6 +64,7 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // TypeScript knows user is not null here, but needs explicit typing
     return this.authService.login(user);
   }
 
