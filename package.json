@@ -31,6 +31,7 @@
     "sonar": "sonar-scanner",
     "sonar:coverage": "npm run test:cov && npm run sonar",
     "sonar:full": "npm run test:all && npm run test:cov && npm run sonar",
+    "prisma:studio": "prisma studio",
     "prepare": "husky"
   },
   "dependencies": {
