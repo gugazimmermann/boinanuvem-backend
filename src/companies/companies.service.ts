@@ -10,6 +10,10 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../email/email.service';
 import { RegisterCompanyDto, UpdateCompanyDto } from './dto';
 
+type PrismaTransaction = Parameters<
+  Parameters<PrismaService['$transaction']>[0]
+>[0];
+
 @Injectable()
 export class CompaniesService {
   constructor(
@@ -22,19 +26,29 @@ export class CompaniesService {
   async registerCompany(
     registerCompanyDto: RegisterCompanyDto,
   ): Promise<unknown> {
-    // Check if company with CNPJ already exists
+    await this.validateCompanyRegistration(registerCompanyDto);
+
+    const result = await this.createCompanyAndUser(registerCompanyDto);
+
+    await this.sendVerificationEmail(result.mainUser);
+
+    return this.buildRegistrationResponse(result);
+  }
+
+  private async validateCompanyRegistration(
+    dto: RegisterCompanyDto,
+  ): Promise<void> {
     const existingCompany = await this.prisma.company.findUnique({
-      where: { cnpj: registerCompanyDto.cnpj },
+      where: { cnpj: dto.cnpj },
     });
 
     if (existingCompany) {
       throw new ConflictException('Company with this CNPJ already exists');
     }
 
-    // Check if company email already exists
-    if (registerCompanyDto.email) {
+    if (dto.email) {
       const existingCompanyEmail = await this.prisma.company.findUnique({
-        where: { email: registerCompanyDto.email },
+        where: { email: dto.email },
       });
 
       if (existingCompanyEmail) {
@@ -42,129 +56,166 @@ export class CompaniesService {
       }
     }
 
-    // Check if user email already exists
-    if (registerCompanyDto.userEmail) {
+    if (dto.userEmail) {
       const existingUser = await this.prisma.user.findUnique({
-        where: { email: registerCompanyDto.userEmail },
+        where: { email: dto.userEmail },
       });
 
       if (existingUser) {
         throw new ConflictException('User with this email already exists');
       }
     }
+  }
 
-    // Create company and main user in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Find the "Avançado" plan for trial
-      const advancedPlan = await tx.plan.findUnique({
-        where: { name: 'Avançado' },
-      });
-
-      if (!advancedPlan) {
-        throw new Error(
-          'Avançado plan not found. Please run database seeding.',
-        );
-      }
-
-      // Initialize trial data
+  private async createCompanyAndUser(dto: RegisterCompanyDto): Promise<{
+    company: { id: string; cnpj: string; companyName: string; email: string };
+    mainUser: { id: string; name: string; email: string; status: string };
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      const advancedPlan = await this.findAdvancedPlan(tx);
       const trialData = this.trialService.initializeTrial();
+      const company = await this.createCompanyInTransaction(tx, dto, trialData);
+      await this.createTrialSubscription(tx, company, advancedPlan);
+      const mainUser = await this.createMainUserInTransaction(tx, dto, company);
 
-      // Create company
-      const company = await tx.company.create({
-        data: {
-          cnpj: registerCompanyDto.cnpj,
-          companyName: registerCompanyDto.companyName,
-          email: registerCompanyDto.email,
-          phone: registerCompanyDto.phone,
-          street: registerCompanyDto.street,
-          number: registerCompanyDto.number,
-          complement: registerCompanyDto.complement ?? null,
-          neighborhood: registerCompanyDto.neighborhood,
-          city: registerCompanyDto.city,
-          state: registerCompanyDto.state,
-          zipCode: registerCompanyDto.zipCode,
-          latitude: registerCompanyDto.latitude ?? null,
-          longitude: registerCompanyDto.longitude ?? null,
-          trialStartDate: trialData.trialStartDate,
-          trialEndDate: trialData.trialEndDate,
-          trialStatus: trialData.trialStatus,
+      return {
+        company: {
+          id: company.id,
+          cnpj: company.cnpj,
+          companyName: company.companyName,
+          email: company.email,
         },
-      });
-
-      // Create trial subscription with "Avançado" plan
-      const trialSubscriptionData = this.trialService.createTrialSubscription(
-        company.id,
-        advancedPlan.id,
-        company.createdAt,
-      );
-
-      await tx.companySubscription.create({
-        data: trialSubscriptionData,
-      });
-
-      // Hash password
-      const hashedPassword = await this.authService.hashPassword(
-        registerCompanyDto.userPassword,
-      );
-
-      // Create main user with full permissions
-      const mainUser = await tx.user.create({
-        data: {
-          name: registerCompanyDto.userName,
-          cpf: registerCompanyDto.userCpf ?? null,
-          email: registerCompanyDto.userEmail,
-          phone: registerCompanyDto.userPhone,
-          password: hashedPassword,
-          street:
-            registerCompanyDto.userStreet ?? registerCompanyDto.street ?? null,
-          number:
-            registerCompanyDto.userNumber ?? registerCompanyDto.number ?? null,
-          complement:
-            registerCompanyDto.userComplement ??
-            registerCompanyDto.complement ??
-            null,
-          neighborhood:
-            registerCompanyDto.userNeighborhood ??
-            registerCompanyDto.neighborhood ??
-            null,
-          city: registerCompanyDto.userCity ?? registerCompanyDto.city ?? null,
-          state:
-            registerCompanyDto.userState ?? registerCompanyDto.state ?? null,
-          zipCode:
-            registerCompanyDto.userZipCode ??
-            registerCompanyDto.zipCode ??
-            null,
-          mainUser: true,
-          status: 'pending', // Will be activated after email verification
-          companyId: company.id,
-          permissions: this.getFullPermissions(),
+        mainUser: {
+          id: mainUser.id,
+          name: mainUser.name,
+          email: mainUser.email,
+          status: mainUser.status,
         },
-      });
+      };
+    });
+  }
 
-      return { company, mainUser };
+  private async findAdvancedPlan(
+    tx: PrismaTransaction,
+  ): Promise<{ id: string }> {
+    const advancedPlan = await tx.plan.findUnique({
+      where: { name: 'Avançado' },
     });
 
-    // Generate email verification token
+    if (!advancedPlan) {
+      throw new Error('Avançado plan not found. Please run database seeding.');
+    }
+
+    return advancedPlan;
+  }
+
+  private async createCompanyInTransaction(
+    tx: PrismaTransaction,
+    dto: RegisterCompanyDto,
+    trialData: {
+      trialStartDate: Date;
+      trialEndDate: Date;
+      trialStatus: string;
+    },
+  ): Promise<{
+    id: string;
+    cnpj: string;
+    companyName: string;
+    email: string;
+    createdAt: Date;
+  }> {
+    return tx.company.create({
+      data: {
+        cnpj: dto.cnpj,
+        companyName: dto.companyName,
+        email: dto.email,
+        phone: dto.phone,
+        street: dto.street,
+        number: dto.number,
+        complement: dto.complement ?? null,
+        neighborhood: dto.neighborhood,
+        city: dto.city,
+        state: dto.state,
+        zipCode: dto.zipCode,
+        latitude: dto.latitude ?? null,
+        longitude: dto.longitude ?? null,
+        trialStartDate: trialData.trialStartDate,
+        trialEndDate: trialData.trialEndDate,
+        trialStatus: trialData.trialStatus,
+      },
+    });
+  }
+
+  private async createTrialSubscription(
+    tx: PrismaTransaction,
+    company: { id: string; createdAt: Date },
+    advancedPlan: { id: string },
+  ): Promise<void> {
+    const trialSubscriptionData = this.trialService.createTrialSubscription(
+      company.id,
+      advancedPlan.id,
+      company.createdAt,
+    );
+
+    await tx.companySubscription.create({
+      data: trialSubscriptionData,
+    });
+  }
+
+  private async createMainUserInTransaction(
+    tx: PrismaTransaction,
+    dto: RegisterCompanyDto,
+    company: { id: string },
+  ): Promise<{ id: string; email: string; name: string; status: string }> {
+    const hashedPassword = await this.authService.hashPassword(
+      dto.userPassword,
+    );
+
+    return tx.user.create({
+      data: {
+        name: dto.userName,
+        cpf: dto.userCpf,
+        email: dto.userEmail,
+        phone: dto.userPhone,
+        password: hashedPassword,
+        street: dto.userStreet ?? dto.street ?? null,
+        number: dto.userNumber ?? dto.number ?? null,
+        complement: dto.userComplement ?? dto.complement ?? null,
+        neighborhood: dto.userNeighborhood ?? dto.neighborhood ?? null,
+        city: dto.userCity ?? dto.city ?? null,
+        state: dto.userState ?? dto.state ?? null,
+        zipCode: dto.userZipCode ?? dto.zipCode ?? null,
+        mainUser: true,
+        status: 'pending',
+        companyId: company.id,
+        permissions: this.getFullPermissions(),
+      },
+    });
+  }
+
+  private async sendVerificationEmail(mainUser: {
+    id: string;
+    email: string;
+    name: string;
+    status: string;
+  }): Promise<void> {
     const verificationToken =
       await this.authService.generateEmailVerificationToken(
-        result.mainUser.id,
-        result.mainUser.email,
+        mainUser.id,
+        mainUser.email,
       );
 
-    // Send verification email
     await this.emailService.sendEmailVerification(
-      result.mainUser.email,
-      result.mainUser.name,
+      mainUser.email,
+      mainUser.name,
       verificationToken,
     );
+  }
 
-    // Send welcome email to company
-    await this.emailService.sendWelcomeEmail(
-      result.company.email,
-      result.mainUser.name,
-      result.company.companyName,
-    );
-
+  private buildRegistrationResponse(result: {
+    company: { id: string; cnpj: string; companyName: string; email: string };
+    mainUser: { id: string; name: string; email: string; status: string };
+  }): unknown {
     return {
       message:
         'Company registered successfully. Please check your email to verify your account.',

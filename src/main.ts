@@ -33,13 +33,34 @@ async function bootstrap() {
       }),
       ...(helmetConfig?.hsts && { hsts: helmetConfig.hsts }),
       crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: false,
     }),
   );
 
-  const corsConfig = configService.get('security.cors') as Record<
+  const corsConfig = (configService.get('security.cors') as Record<
     string,
     unknown
-  >;
+  >) || {
+    origin: ['http://localhost:3000', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers',
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  };
+
+  // Log CORS configuration for debugging
+  logger.log(`CORS configuration: ${JSON.stringify(corsConfig)}`);
+
   app.enableCors(corsConfig);
 
   app.useGlobalPipes(

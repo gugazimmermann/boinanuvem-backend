@@ -7,13 +7,15 @@ interface SubscriptionLike {
   endDate?: Date | null;
 }
 
+export type TrialStatus = 'active' | 'expired' | 'converted' | null;
+
 export interface TrialInfo {
   isOnTrial: boolean;
   isTrialExpired: boolean;
   trialDaysRemaining: number;
   trialStartDate: Date | null;
   trialEndDate: Date | null;
-  trialStatus: 'active' | 'expired' | 'converted' | null;
+  trialStatus: TrialStatus;
 }
 
 @Injectable()
@@ -51,7 +53,7 @@ export class TrialService {
         trialDaysRemaining: 0,
         trialStartDate: company.trialStartDate,
         trialEndDate: company.trialEndDate,
-        trialStatus: company.trialStatus as 'converted' | null,
+        trialStatus: company.trialStatus as TrialStatus,
       };
     }
 
@@ -77,8 +79,7 @@ export class TrialService {
     );
 
     // Determine trial status
-    let trialStatus: 'active' | 'expired' | 'converted' | null =
-      company.trialStatus as 'active' | 'expired' | 'converted' | null;
+    let trialStatus: TrialStatus = company.trialStatus as TrialStatus;
     if (!trialStatus) {
       trialStatus = isTrialExpired ? 'expired' : 'active';
     }

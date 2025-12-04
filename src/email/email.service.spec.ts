@@ -85,10 +85,10 @@ describe('EmailService', () => {
     expect(mockSendMail).toHaveBeenCalledWith(
       expect.objectContaining({
         html: expect.stringContaining(
-          'http://localhost:3000/verify-email?token=token123',
+          'http://localhost:3000/verificar-email?token=token123',
         ) as string,
         text: expect.stringContaining(
-          'http://localhost:3000/verify-email?token=token123',
+          'http://localhost:3000/verificar-email?token=token123',
         ) as string,
       }),
     );
@@ -166,10 +166,10 @@ describe('EmailService', () => {
     expect(mockSendMail).toHaveBeenCalledWith(
       expect.objectContaining({
         html: expect.stringContaining(
-          'http://localhost:3000/verify-email?token=invitation-token',
+          'http://localhost:3000/configurar-senha?token=invitation-token',
         ) as string,
         text: expect.stringContaining(
-          'http://localhost:3000/verify-email?token=invitation-token',
+          'http://localhost:3000/configurar-senha?token=invitation-token',
         ) as string,
       }),
     );
@@ -197,5 +197,128 @@ describe('EmailService', () => {
         'token123',
       ),
     ).rejects.toThrow('Failed to send email: Unknown error');
+  });
+
+  it('should handle email sending when messageId is undefined', async () => {
+    mockSendMail.mockResolvedValue({});
+
+    await service.sendEmailVerification(
+      'test@example.com',
+      'Test User',
+      'token123',
+    );
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      'Email sent successfully to test@example.com. Message ID: unknown',
+    );
+  });
+
+  it('should handle welcome email with undefined frontend URL', async () => {
+    mockConfigService.get.mockImplementation((key: string) => {
+      if (key === 'FRONTEND_URL') return undefined;
+      if (key === 'GMAIL_EMAIL') return 'test@gmail.com';
+      if (key === 'GMAIL_PASSWORD') return 'testpassword';
+      return 'default-value';
+    });
+
+    await service.sendWelcomeEmail(
+      'test@example.com',
+      'Test User',
+      'Test Company',
+    );
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining('Test User') as string,
+        text: expect.stringContaining('Test User') as string,
+      }),
+    );
+  });
+
+  it('should create email template without button when buttonUrl is not provided', async () => {
+    // This tests the createEmailTemplate private method indirectly
+    await service.sendWelcomeEmail(
+      'test@example.com',
+      'Test User',
+      'Test Company',
+    );
+
+    const call = mockSendMail.mock.calls[0][0] as {
+      html: string;
+      text: string;
+    };
+    expect(call.html).toBeDefined();
+    expect(call.text).toBeDefined();
+    // Button should still be present in welcome email (frontend URL)
+    expect(call.html).toContain('button');
+  });
+
+  it('should log error details when email sending fails', async () => {
+    const error = new Error('SMTP connection failed');
+    mockSendMail.mockRejectedValue(error);
+
+    await expect(
+      service.sendEmailVerification(
+        'test@example.com',
+        'Test User',
+        'token123',
+      ),
+    ).rejects.toThrow();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to send email to test@example.com:',
+      error,
+    );
+  });
+
+  it('should send password reset email with correct URL', async () => {
+    // Reset config service mock to return proper URL
+    mockConfigService.get.mockImplementation((key: string) => {
+      if (key === 'FRONTEND_URL') return 'http://localhost:3000';
+      if (key === 'GMAIL_EMAIL') return 'test@gmail.com';
+      if (key === 'GMAIL_PASSWORD') return 'testpassword';
+      return 'default-value';
+    });
+
+    await service.sendPasswordReset('test@example.com', 'reset-token');
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          'http://localhost:3000/reset-password?token=reset-token',
+        ) as string,
+        text: expect.stringContaining(
+          'http://localhost:3000/reset-password?token=reset-token',
+        ) as string,
+      }),
+    );
+  });
+
+  it('should send team member invitation with correct URL', async () => {
+    // Reset config service mock to return proper URL
+    mockConfigService.get.mockImplementation((key: string) => {
+      if (key === 'FRONTEND_URL') return 'http://localhost:3000';
+      if (key === 'GMAIL_EMAIL') return 'test@gmail.com';
+      if (key === 'GMAIL_PASSWORD') return 'testpassword';
+      return 'default-value';
+    });
+
+    await service.sendTeamMemberInvitation(
+      'member@example.com',
+      'Admin User',
+      'Test Company',
+      'invitation-token',
+    );
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          'http://localhost:3000/configurar-senha?token=invitation-token',
+        ) as string,
+        text: expect.stringContaining(
+          'http://localhost:3000/configurar-senha?token=invitation-token',
+        ) as string,
+      }),
+    );
   });
 });

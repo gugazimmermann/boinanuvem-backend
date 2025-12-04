@@ -5,7 +5,9 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { formatZipCode } from '../../common/utils/format-utils';
 
 export class UpdateCompanyDto {
   @ApiProperty({ example: 'Fazenda Boi na Nuvem Ltda', required: false })
@@ -57,6 +59,9 @@ export class UpdateCompanyDto {
 
   @ApiProperty({ example: '88303-030', required: false })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value ? formatZipCode(value as string | null | undefined) : value,
+  )
   @IsString()
   @Matches(/^\d{5}-\d{3}$/, { message: 'ZIP code must be in format XXXXX-XXX' })
   zipCode?: string;

@@ -27,7 +27,10 @@ describe('Security Config', () => {
     expect(config.helmet.hsts.maxAge).toBe(31536000);
     expect(config.request.timeout).toBe(30000);
     expect(config.request.maxSize).toBe('10mb');
-    expect(config.cors.origin).toEqual(['http://localhost:3000']);
+    expect(config.cors.origin).toEqual([
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ]);
   });
 
   it('should use environment values when provided', () => {
@@ -68,7 +71,11 @@ describe('Security Config', () => {
     expect(isNaN(config.helmet.hsts.maxAge)).toBe(true);
     expect(isNaN(config.request.timeout)).toBe(true);
     expect(config.request.maxSize).toBe('');
-    expect(config.cors.origin).toEqual(['']);
+    // Empty string is falsy, so default is used
+    expect(config.cors.origin).toEqual([
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ]);
   });
 
   it('should handle null environment values with nullish coalescing', () => {
@@ -86,6 +93,9 @@ describe('Security Config', () => {
     expect(config.helmet.hsts.maxAge).toBe(31536000);
     expect(config.request.timeout).toBe(30000);
     expect(config.request.maxSize).toBe('10mb');
-    expect(config.cors.origin).toEqual(['http://localhost:3000']);
+    expect(config.cors.origin).toEqual([
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ]);
   });
 });

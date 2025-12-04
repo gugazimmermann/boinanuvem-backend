@@ -33,7 +33,7 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
 
 ### Testing & Quality Assurance
 - **Testing Framework**: Jest 30.0.0 with comprehensive test suites
-- **Test Coverage**: Unit, Integration & E2E tests with 524+ tests total (90.07% statement coverage)
+- **Test Coverage**: Unit, Integration & E2E tests with 549 tests total (90.07% statement coverage)
 - **Code Quality**: ESLint 9.18.0 with TypeScript-specific rules
 - **Code Formatting**: Prettier 3.4.2 for consistent code style
 - **Git Hooks**: Husky 9.1.7 for pre-commit quality checks
@@ -405,7 +405,9 @@ GMAIL_EMAIL=your-gmail-account@gmail.com
 GMAIL_PASSWORD=your-16-character-app-password
 
 # Frontend URL for email links
-FRONTEND_URL=http://localhost:3000
+# Development: http://localhost:5173
+# Production: https://www.boinanuvem.com.br
+FRONTEND_URL=http://localhost:5173
 ```
 
 #### Email Templates
@@ -515,9 +517,9 @@ Pre-commit hooks automatically run:
 ## API Documentation
 
 ### Swagger/OpenAPI
-When `ENABLE_SWAGGER=true`, interactive API documentation is available at:
-- **Development**: `http://localhost:3000/api-docs`
-- **Production**: Disabled by default for security
+Interactive API documentation is automatically available in development mode at:
+- **Development**: `http://localhost:3000/api-docs` (always enabled)
+- **Production**: Disabled by default for security (controlled by `ENABLE_SWAGGER` environment variable)
 
 The documentation includes:
 - Complete API endpoint documentation with authentication
@@ -575,11 +577,7 @@ The documentation includes:
     - `status`: Filter by plan status (`active`, `inactive`, `all`) - defaults to `active`
 
 #### Subscription Management
-- `GET /subscriptions/company/:companyId` - Get company subscriptions (authenticated)
-- `GET /subscriptions/company/:companyId/current` - Get current active subscription
-- `POST /subscriptions` - Create new subscription (main user only)
-- `PUT /subscriptions/:id` - Update subscription (main user only)
-- `DELETE /subscriptions/:id` - Cancel subscription (main user only)
+> **Note**: Subscription management is currently handled internally through the `SubscriptionsService`. HTTP endpoints for subscription management are planned for future releases. Subscriptions are accessible through company and user endpoints that include subscription data in their responses.
 
 #### Payment Management
 - `GET /payments/company/:companyId` - Get company payment history (authenticated)
@@ -699,12 +697,12 @@ Security events are logged to `logs/security-*.log` and alerts to `logs/error-*.
 
 ## Testing Strategy
 
-The application has comprehensive test coverage with **524 tests** across multiple test types:
+The application has comprehensive test coverage with **549 tests** across multiple test types:
 
 ### Test Coverage Summary
-- **Unit Tests**: 452 tests covering services, controllers, and guards
+- **Unit Tests**: 473 tests covering services, controllers, and guards
 - **Integration Tests**: 7 tests for database operations and business logic
-- **E2E Tests**: 65 tests for complete API endpoint workflows
+- **E2E Tests**: 69 tests for complete API endpoint workflows
 - **Overall Coverage**: 90.07% statement coverage, 80.83% branch coverage
 
 ### Test Categories
@@ -720,13 +718,13 @@ The application has comprehensive test coverage with **524 tests** across multip
 
 ### Running Tests
 ```bash
-# Run all tests (524 total)
+# Run all tests (549 total)
 npm run test:all
 
 # Run specific test suites
-npm run test              # Unit tests only (452 tests)
+npm run test              # Unit tests only (473 tests)
 npm run test:integration  # Integration tests only (7 tests)
-npm run test:e2e         # End-to-end tests only (65 tests)
+npm run test:e2e         # End-to-end tests only (69 tests)
 
 # Test with coverage
 npm run test:cov
@@ -758,14 +756,14 @@ DATABASE_URL="postgresql://username:password@localhost:5432/boinanuvem"
 
 # Authentication
 JWT_SECRET="your-super-secure-jwt-secret-key"
-FRONTEND_URL="https://yourdomain.com"
+FRONTEND_URL="https://www.boinanuvem.com.br"
 
 # Email Configuration
 GMAIL_EMAIL="your-production-email@gmail.com"
 GMAIL_PASSWORD="your-gmail-app-password"
 
 # Security
-CORS_ORIGIN=https://yourdomain.com
+CORS_ORIGIN=https://www.boinanuvem.com.br
 RATE_LIMIT_TTL=60000
 RATE_LIMIT_MAX=50
 ENABLE_SWAGGER=false
@@ -835,7 +833,7 @@ src/
 │   ├── plans.controller.ts
 │   ├── plans.service.ts
 │   └── plans.module.ts
-├── subscriptions/        # Subscription management module
+├── subscriptions/        # Subscription management module (service only, no HTTP endpoints)
 │   ├── subscriptions.service.ts # Subscription lifecycle management
 │   └── subscriptions.service.spec.ts # Subscription tests
 ├── payments/             # Payment management module

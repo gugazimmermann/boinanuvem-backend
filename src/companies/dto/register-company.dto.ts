@@ -5,10 +5,20 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  formatCNPJ,
+  formatCPF,
+  formatZipCode,
+  type NullableString,
+} from '../../common/utils/format-utils';
 
 export class RegisterCompanyDto {
   @ApiProperty({ example: '12.345.678/0001-90' })
+  @Transform(({ value }: { value: unknown }) =>
+    formatCNPJ(value as NullableString),
+  )
   @IsString()
   @Matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, {
     message: 'CNPJ must be in format XX.XXX.XXX/XXXX-XX',
@@ -55,16 +65,31 @@ export class RegisterCompanyDto {
   state: string;
 
   @ApiProperty({ example: '88303-030' })
+  @Transform(({ value }: { value: unknown }) =>
+    formatZipCode(value as NullableString),
+  )
   @IsString()
   @Matches(/^\d{5}-\d{3}$/, { message: 'ZIP code must be in format XXXXX-XXX' })
   zipCode: string;
 
   @ApiProperty({ example: -26.9056, required: false })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const num =
+      typeof value === 'string' ? parseFloat(value) : (value as number);
+    return isNaN(num) ? undefined : num;
+  })
   latitude?: number;
 
   @ApiProperty({ example: -48.6556, required: false })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const num =
+      typeof value === 'string' ? parseFloat(value) : (value as number);
+    return isNaN(num) ? undefined : num;
+  })
   longitude?: number;
 
   // Main user data
@@ -73,13 +98,15 @@ export class RegisterCompanyDto {
   @MinLength(2)
   userName: string;
 
-  @ApiProperty({ example: '123.456.789-00', required: false })
-  @IsOptional()
+  @ApiProperty({ example: '123.456.789-00' })
+  @Transform(({ value }: { value: unknown }) =>
+    formatCPF(value as NullableString),
+  )
   @IsString()
   @Matches(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, {
     message: 'CPF must be in format XXX.XXX.XXX-XX',
   })
-  userCpf?: string;
+  userCpf: string;
 
   @ApiProperty({ example: 'joao@fazenda.com.br' })
   @IsEmail()
@@ -128,6 +155,9 @@ export class RegisterCompanyDto {
 
   @ApiProperty({ example: '88303-040', required: false })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value ? formatZipCode(value as NullableString) : value,
+  )
   @IsString()
   @Matches(/^\d{5}-\d{3}$/, { message: 'ZIP code must be in format XXXXX-XXX' })
   userZipCode?: string;

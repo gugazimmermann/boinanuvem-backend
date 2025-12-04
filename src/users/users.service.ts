@@ -10,6 +10,7 @@ import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../email/email.service';
 import { CreateUserDto, UpdateUserDto, UpdatePermissionsDto } from './dto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -91,6 +92,10 @@ export class UsersService {
         where: { id: userId },
         data: {
           ...updateUserDto,
+          cpf:
+            updateUserDto.cpf != null && updateUserDto.cpf.trim() !== ''
+              ? updateUserDto.cpf
+              : null,
           status: 'pending',
           emailVerifiedAt: null,
         },
@@ -111,7 +116,13 @@ export class UsersService {
     // Update user without email change
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: updateUserDto,
+      data: {
+        ...updateUserDto,
+        cpf:
+          updateUserDto.cpf != null && updateUserDto.cpf.trim() !== ''
+            ? updateUserDto.cpf
+            : null,
+      },
       include: {
         company: true,
       },
@@ -181,15 +192,20 @@ export class UsersService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Hash password
-    const hashedPassword = await this.authService.hashPassword(
-      createUserDto.password,
-    );
+    // Generate a random temporary password if not provided
+    // This password will be replaced when the user sets their password via email
+    const tempPassword =
+      createUserDto.password ?? crypto.randomBytes(16).toString('hex');
+    const hashedPassword = await this.authService.hashPassword(tempPassword);
 
     // Create team member with default permissions (no permissions)
     const newUser = await this.prisma.user.create({
       data: {
         ...createUserDto,
+        cpf:
+          createUserDto.cpf && createUserDto.cpf.trim() !== ''
+            ? createUserDto.cpf
+            : null,
         password: hashedPassword,
         mainUser: false,
         status: 'pending',
@@ -206,14 +222,14 @@ export class UsersService {
       },
     });
 
-    // Generate email verification token
+    // Generate email verification token (this will be used for password setup)
     const verificationToken =
       await this.authService.generateEmailVerificationToken(
         newUser.id,
         newUser.email,
       );
 
-    // Send team invitation email
+    // Send team invitation email with password setup link
     await this.emailService.sendTeamMemberInvitation(
       newUser.email,
       mainUser.name,
@@ -292,6 +308,10 @@ export class UsersService {
         where: { id: targetUserId },
         data: {
           ...updateUserDto,
+          cpf:
+            updateUserDto.cpf != null && updateUserDto.cpf.trim() !== ''
+              ? updateUserDto.cpf
+              : null,
           status: 'pending',
           emailVerifiedAt: null,
         },
@@ -313,7 +333,13 @@ export class UsersService {
     // Update user without email change
     const updatedUser = await this.prisma.user.update({
       where: { id: targetUserId },
-      data: updateUserDto,
+      data: {
+        ...updateUserDto,
+        cpf:
+          updateUserDto.cpf != null && updateUserDto.cpf.trim() !== ''
+            ? updateUserDto.cpf
+            : null,
+      },
       select: {
         id: true,
         name: true,

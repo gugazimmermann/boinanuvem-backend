@@ -4,8 +4,11 @@ import {
   IsOptional,
   MinLength,
   Matches,
+  ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { formatCPF, formatZipCode } from '../../common/utils/format-utils';
 
 export class UpdateUserDto {
   @ApiProperty({ example: 'Maria Santos Silva', required: false })
@@ -16,6 +19,13 @@ export class UpdateUserDto {
 
   @ApiProperty({ example: '234.567.890-11', required: false })
   @IsOptional()
+  @ValidateIf((o: { cpf?: string }) => {
+    const cpf = o.cpf;
+    return cpf != null && typeof cpf === 'string' && cpf.trim() !== '';
+  })
+  @Transform(({ value }: { value: unknown }) =>
+    value ? formatCPF(value as string | null | undefined) : value,
+  )
   @IsString()
   @Matches(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, {
     message: 'CPF must be in format XXX.XXX.XXX-XX',
@@ -65,6 +75,9 @@ export class UpdateUserDto {
 
   @ApiProperty({ example: '88330-000', required: false })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value ? formatZipCode(value as string | null | undefined) : value,
+  )
   @IsString()
   @Matches(/^\d{5}-\d{3}$/, { message: 'ZIP code must be in format XXXXX-XXX' })
   zipCode?: string;

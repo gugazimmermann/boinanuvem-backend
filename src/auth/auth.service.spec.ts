@@ -95,6 +95,7 @@ describe('AuthService', () => {
 
   const mockEmailService = {
     sendEmailVerification: jest.fn(),
+    sendWelcomeEmail: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -993,7 +994,7 @@ describe('AuthService', () => {
   });
 
   describe('verifyEmail', () => {
-    it('should verify email successfully', async () => {
+    it('should verify email successfully and send welcome email for main user on first verification', async () => {
       const mockVerification = {
         id: 'verification-1',
         token: 'valid-token',
@@ -1005,6 +1006,13 @@ describe('AuthService', () => {
           id: 'user-1',
           email: 'user@test.com',
           emailVerifiedAt: null,
+          mainUser: true,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
         },
       };
 
@@ -1037,6 +1045,11 @@ describe('AuthService', () => {
           email: 'user@test.com',
         },
       });
+      expect(mockEmailService.sendWelcomeEmail).toHaveBeenCalledWith(
+        'company@test.com',
+        'Test User',
+        'Test Company',
+      );
     });
 
     it('should throw error for invalid token', async () => {
@@ -1045,6 +1058,48 @@ describe('AuthService', () => {
       await expect(service.verifyEmail('invalid-token')).rejects.toThrow(
         'Invalid or expired verification token',
       );
+    });
+
+    it('should verify email successfully but not send welcome email for non-main user', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'valid-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+          emailVerifiedAt: null,
+          mainUser: false,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+      });
+
+      const result = await service.verifyEmail('valid-token');
+
+      expect(result).toEqual({ message: 'Email verified successfully' });
+      expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled();
     });
 
     it('should throw error for expired token', async () => {
@@ -1093,7 +1148,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw error if email already verified', async () => {
+    it('should verify email but not send welcome email if email was already verified (email change)', async () => {
       const mockVerification = {
         id: 'verification-1',
         token: 'valid-token',
@@ -1105,16 +1160,34 @@ describe('AuthService', () => {
           id: 'user-1',
           email: 'user@test.com',
           emailVerifiedAt: new Date(Date.now() - 86400000), // Verified 1 day ago
+          mainUser: true,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
         },
       };
 
       prismaService.emailVerification.findUnique.mockResolvedValue(
         mockVerification,
       );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+      });
 
       const result = await service.verifyEmail('valid-token');
 
       expect(result).toEqual({ message: 'Email verified successfully' });
+      expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -1136,6 +1209,286 @@ describe('AuthService', () => {
       const result = await service.logout('user-1', 'nonexistent-token');
 
       expect(result).toBeUndefined();
+    });
+
+    it('should logout from all devices when no token provided', async () => {
+      prismaService.refreshToken.deleteMany.mockResolvedValue({ count: 3 });
+
+      const result = await service.logout('user-1');
+
+      expect(result).toBeUndefined();
+      expect(prismaService.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+      });
+    });
+  });
+
+  describe('setupPassword', () => {
+    it('should setup password successfully and send welcome email for main user on first verification', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'valid-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+          emailVerifiedAt: null,
+          mainUser: true,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      mockedBcrypt.hash.mockResolvedValue('hashed-password');
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+        password: 'hashed-password',
+      });
+      prismaService.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.setupPassword(
+        'valid-token',
+        'newPassword123',
+      );
+
+      expect(result).toEqual({
+        message: 'Password set and email verified successfully',
+      });
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPassword123', 12);
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: {
+          status: 'active',
+          emailVerifiedAt: expect.any(Date),
+          email: 'user@test.com',
+          password: 'hashed-password',
+        },
+      });
+      expect(prismaService.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+      });
+      expect(mockEmailService.sendWelcomeEmail).toHaveBeenCalledWith(
+        'company@test.com',
+        'Test User',
+        'Test Company',
+      );
+    });
+
+    it('should setup password but not send welcome email for non-main user', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'valid-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+          emailVerifiedAt: null,
+          mainUser: false,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      mockedBcrypt.hash.mockResolvedValue('hashed-password');
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+        password: 'hashed-password',
+      });
+      prismaService.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.setupPassword(
+        'valid-token',
+        'newPassword123',
+      );
+
+      expect(result).toEqual({
+        message: 'Password set and email verified successfully',
+      });
+      expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled();
+    });
+
+    it('should setup password but not send welcome email if email was already verified', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'valid-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+          emailVerifiedAt: new Date(Date.now() - 86400000), // Verified 1 day ago
+          mainUser: true,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      mockedBcrypt.hash.mockResolvedValue('hashed-password');
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+        password: 'hashed-password',
+      });
+      prismaService.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.setupPassword(
+        'valid-token',
+        'newPassword123',
+      );
+
+      expect(result).toEqual({
+        message: 'Password set and email verified successfully',
+      });
+      expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled();
+    });
+
+    it('should throw error for invalid token', async () => {
+      prismaService.emailVerification.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.setupPassword('invalid-token', 'newPassword123'),
+      ).rejects.toThrow('Invalid or expired verification token');
+    });
+
+    it('should throw error for expired token', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'expired-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() - 3600000), // 1 hour ago
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+
+      await expect(
+        service.setupPassword('expired-token', 'newPassword123'),
+      ).rejects.toThrow('Invalid or expired verification token');
+    });
+
+    it('should throw error for already used token', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'used-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: new Date(Date.now() - 1800000), // Used 30 minutes ago
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+
+      await expect(
+        service.setupPassword('used-token', 'newPassword123'),
+      ).rejects.toThrow('Invalid or expired verification token');
+    });
+
+    it('should invalidate all refresh tokens after password setup', async () => {
+      const mockVerification = {
+        id: 'verification-1',
+        token: 'valid-token',
+        email: 'user@test.com',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        user: {
+          id: 'user-1',
+          email: 'user@test.com',
+          emailVerifiedAt: null,
+          mainUser: false,
+          name: 'Test User',
+          company: {
+            id: 'company-1',
+            email: 'company@test.com',
+            companyName: 'Test Company',
+          },
+        },
+      };
+
+      prismaService.emailVerification.findUnique.mockResolvedValue(
+        mockVerification,
+      );
+      prismaService.emailVerification.update.mockResolvedValue({
+        ...mockVerification,
+        usedAt: new Date(),
+      });
+      mockedBcrypt.hash.mockResolvedValue('hashed-password');
+      prismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@test.com',
+        emailVerifiedAt: new Date(),
+        status: 'active',
+        password: 'hashed-password',
+      });
+      prismaService.refreshToken.deleteMany.mockResolvedValue({ count: 2 });
+
+      await service.setupPassword('valid-token', 'newPassword123');
+
+      expect(prismaService.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+      });
     });
   });
 });

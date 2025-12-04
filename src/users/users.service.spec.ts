@@ -15,6 +15,12 @@ describe('UsersService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    company: {
+      update: jest.fn(),
+    },
+    companySubscription: {
+      update: jest.fn(),
+    },
     refreshToken: {
       deleteMany: jest.fn(),
     },
@@ -123,6 +129,127 @@ describe('UsersService', () => {
         'User not found',
       );
     });
+
+    it('should update trial status when expired', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+        company: {
+          id: 'company-1',
+          name: 'Test Company',
+          trialStartDate: new Date('2024-01-01'),
+          trialEndDate: new Date('2024-01-15'),
+          trialStatus: 'active',
+          createdAt: new Date('2024-01-01'),
+          subscriptions: [],
+        },
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockTrialService.calculateTrialInfo.mockReturnValue({
+        isOnTrial: false,
+        isTrialExpired: true,
+        trialDaysRemaining: 0,
+        trialStatus: 'expired',
+      });
+      mockTrialService.shouldUpdateTrialStatus.mockReturnValue(true);
+      mockPrismaService.company.update.mockResolvedValue({});
+      mockPrismaService.companySubscription.update.mockResolvedValue({});
+
+      await service.getCurrentUser('user-1');
+
+      expect(mockPrismaService.company.update).toHaveBeenCalledWith({
+        where: { id: 'company-1' },
+        data: { trialStatus: 'expired' },
+      });
+    });
+
+    it('should update trial subscription status when expired', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+        company: {
+          id: 'company-1',
+          name: 'Test Company',
+          trialStartDate: new Date('2024-01-01'),
+          trialEndDate: new Date('2024-01-15'),
+          trialStatus: 'active',
+          createdAt: new Date('2024-01-01'),
+          subscriptions: [
+            {
+              id: 'sub-1',
+              isTrial: true,
+              isActive: true,
+              status: 'trial',
+            },
+          ],
+        },
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockTrialService.calculateTrialInfo.mockReturnValue({
+        isOnTrial: false,
+        isTrialExpired: true,
+        trialDaysRemaining: 0,
+        trialStatus: 'expired',
+      });
+      mockTrialService.shouldUpdateTrialStatus.mockReturnValue(true);
+      mockPrismaService.company.update.mockResolvedValue({});
+      mockPrismaService.companySubscription.update.mockResolvedValue({});
+
+      await service.getCurrentUser('user-1');
+
+      expect(mockPrismaService.companySubscription.update).toHaveBeenCalledWith(
+        {
+          where: { id: 'sub-1' },
+          data: { status: 'expired', isActive: false },
+        },
+      );
+    });
+
+    it('should include active subscription in response', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        name: 'Test User',
+        company: {
+          id: 'company-1',
+          name: 'Test Company',
+          subscriptions: [
+            {
+              id: 'sub-1',
+              status: 'active',
+              isActive: true,
+              isTrial: false,
+              plan: {
+                id: 'plan-1',
+                name: 'Avançado',
+              },
+            },
+          ],
+        },
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockTrialService.calculateTrialInfo.mockReturnValue({
+        isOnTrial: false,
+        isTrialExpired: false,
+        trialDaysRemaining: 0,
+        trialStatus: 'expired',
+      });
+      mockTrialService.shouldUpdateTrialStatus.mockReturnValue(false);
+
+      const result = await service.getCurrentUser('user-1');
+
+      expect(
+        (result as { company: { currentPlan: unknown } }).company.currentPlan,
+      ).toEqual({
+        id: 'plan-1',
+        name: 'Avançado',
+      });
+    });
   });
 
   describe('getTeamMembers', () => {
@@ -207,7 +334,10 @@ describe('UsersService', () => {
       expect(result).toEqual(updatedUser);
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        data: updateDto,
+        data: {
+          ...updateDto,
+          cpf: null, // Service sets cpf to null when not provided
+        },
         include: { company: true },
       });
     });
@@ -220,21 +350,146 @@ describe('UsersService', () => {
       ).rejects.toThrow('User not found');
     });
 
-    it('should handle email conflicts', async () => {
+    it('should handle email change with verification', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'user@test.com',
+        name: 'Test User',
+        status: 'active',
+      };
+
+      const updateDto = {
+        email: 'newemail@test.com',
+        name: 'Updated Name',
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockUser) // First call for current user
+        .mockResolvedValueOnce(null); // Second call for email check (not exists)
+      mockAuthService.generateEmailVerificationToken.mockResolvedValue(
+        'verification-token',
+      );
+      mockEmailService.sendEmailVerification.mockResolvedValue(undefined);
+      mockPrismaService.user.update.mockResolvedValue({
+        id: 'user-1',
+        name: 'Updated Name',
+        email: 'newemail@test.com',
+        status: 'pending',
+      });
+
+      const result = await service.updateCurrentUser('user-1', updateDto);
+
+      expect(result).toEqual({
+        id: 'user-1',
+        name: 'Updated Name',
+        email: 'newemail@test.com',
+        status: 'pending',
+        message: 'Profile updated. Please verify your new email address.',
+      });
+      expect(
+        mockAuthService.generateEmailVerificationToken,
+      ).toHaveBeenCalledWith('user-1', 'newemail@test.com');
+      expect(mockEmailService.sendEmailVerification).toHaveBeenCalledWith(
+        'newemail@test.com',
+        'Updated Name',
+        'verification-token',
+      );
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: {
+          ...updateDto,
+          cpf: null,
+          status: 'pending',
+          emailVerifiedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+        },
+      });
+    });
+
+    it('should handle email conflicts when email already exists', async () => {
       const mockUser = {
         id: 'user-1',
         email: 'user@test.com',
         name: 'Test User',
       };
 
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.user.update.mockRejectedValue(
-        new Error('Email already exists'),
-      );
+      const existingUser = {
+        id: 'user-2',
+        email: 'existing@test.com',
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockUser) // First call for current user
+        .mockResolvedValueOnce(existingUser); // Second call for email check (exists)
 
       await expect(
         service.updateCurrentUser('user-1', { email: 'existing@test.com' }),
       ).rejects.toThrow('User with this email already exists');
+    });
+
+    it('should not change email when same email is provided', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'user@test.com',
+        name: 'Test User',
+        phone: '(11) 99999-9999',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+      };
+
+      const updateDto = {
+        email: 'user@test.com', // Same email
+        name: 'Updated Name',
+      };
+
+      const updatedUser = { ...mockUser, ...updateDto };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateCurrentUser('user-1', updateDto);
+
+      expect(result).toEqual(updatedUser);
+      expect(
+        mockAuthService.generateEmailVerificationToken,
+      ).not.toHaveBeenCalled();
+      expect(mockEmailService.sendEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it('should handle CPF with whitespace correctly', async () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'user@test.com',
+        name: 'Test User',
+        cpf: '123.456.789-00',
+      };
+
+      const updateDto = {
+        cpf: '   ', // Whitespace only
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        cpf: null,
+      });
+
+      await service.updateCurrentUser('user-1', updateDto);
+
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: {
+          ...updateDto,
+          cpf: null,
+        },
+        include: { company: true },
+      });
     });
   });
 
@@ -315,6 +570,99 @@ describe('UsersService', () => {
         },
       });
       expect(mockEmailService.sendTeamMemberInvitation).toHaveBeenCalled();
+    });
+
+    it('should create team member without password (generate random)', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+        name: 'Main User',
+        company: {
+          companyName: 'Test Company',
+        },
+      };
+
+      const createDto = {
+        email: 'team@test.com',
+        name: 'Team Member',
+        phone: '(11) 99999-9999',
+        cpf: '987.654.321-00',
+        // No password provided
+      };
+
+      const createdUser = {
+        id: 'team-user-1',
+        ...createDto,
+        password: 'hashed-random-password',
+        companyId: 'company-1',
+        mainUser: false,
+        status: 'pending',
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(null);
+      mockAuthService.hashPassword.mockResolvedValue('hashed-random-password');
+      mockAuthService.generateEmailVerificationToken.mockResolvedValue(
+        'verification-token',
+      );
+      mockPrismaService.user.create.mockResolvedValue(createdUser);
+      mockEmailService.sendTeamMemberInvitation.mockResolvedValue(undefined);
+
+      await service.createTeamMember('main-user-1', createDto);
+
+      expect(mockAuthService.hashPassword).toHaveBeenCalled();
+      const hashCall = mockAuthService.hashPassword.mock.calls[0][0];
+      expect(hashCall).toBeDefined();
+      expect(typeof hashCall).toBe('string');
+      expect(hashCall.length).toBeGreaterThan(0);
+    });
+
+    it('should handle CPF with whitespace correctly when creating team member', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+        name: 'Main User',
+        company: {
+          companyName: 'Test Company',
+        },
+      };
+
+      const createDto = {
+        email: 'team@test.com',
+        name: 'Team Member',
+        phone: '(11) 99999-9999',
+        cpf: '   ', // Whitespace only
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(null);
+      mockAuthService.hashPassword.mockResolvedValue('hashed-password');
+      mockAuthService.generateEmailVerificationToken.mockResolvedValue(
+        'verification-token',
+      );
+      mockPrismaService.user.create.mockResolvedValue({
+        id: 'team-user-1',
+        ...createDto,
+        cpf: null,
+      });
+      mockEmailService.sendTeamMemberInvitation.mockResolvedValue(undefined);
+
+      await service.createTeamMember('main-user-1', createDto);
+
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cpf: null,
+        }),
+        select: expect.any(Object),
+      });
     });
 
     it('should throw error when main user not found', async () => {
@@ -420,8 +768,30 @@ describe('UsersService', () => {
       expect(result).toEqual(updatedUser);
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: 'team-user-1' },
-        data: updateDto,
-        select: expect.any(Object),
+        data: {
+          ...updateDto,
+          cpf: null, // Service sets cpf to null when not provided
+        },
+        select: {
+          id: true,
+          name: true,
+          cpf: true,
+          email: true,
+          phone: true,
+          street: true,
+          number: true,
+          complement: true,
+          neighborhood: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          mainUser: true,
+          status: true,
+          permissions: true,
+          lastAccess: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+        },
       });
     });
 
@@ -481,6 +851,190 @@ describe('UsersService', () => {
           name: 'Updated Name',
         }),
       ).rejects.toThrow('Cannot update users from different companies');
+    });
+
+    it('should handle email change for team member with verification', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+      };
+
+      const mockTeamMember = {
+        id: 'team-user-1',
+        email: 'team@test.com',
+        name: 'Team Member',
+        companyId: 'company-1',
+        mainUser: false,
+        status: 'active',
+      };
+
+      const updateDto = {
+        email: 'newemail@test.com',
+        name: 'Updated Team Member',
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(mockTeamMember)
+        .mockResolvedValueOnce(null); // Email check (not exists)
+      mockAuthService.generateEmailVerificationToken.mockResolvedValue(
+        'verification-token',
+      );
+      mockEmailService.sendEmailVerification.mockResolvedValue(undefined);
+      mockPrismaService.user.update.mockResolvedValue({
+        id: 'team-user-1',
+        name: 'Updated Team Member',
+        email: 'newemail@test.com',
+        status: 'pending',
+        mainUser: false,
+      });
+
+      const result = await service.updateTeamMember(
+        'main-user-1',
+        'team-user-1',
+        updateDto,
+      );
+
+      expect(result).toEqual({
+        id: 'team-user-1',
+        name: 'Updated Team Member',
+        email: 'newemail@test.com',
+        status: 'pending',
+        mainUser: false,
+        message: 'User updated. Email verification sent to new address.',
+      });
+      expect(
+        mockAuthService.generateEmailVerificationToken,
+      ).toHaveBeenCalledWith('team-user-1', 'newemail@test.com');
+      expect(mockEmailService.sendEmailVerification).toHaveBeenCalledWith(
+        'newemail@test.com',
+        'Updated Team Member',
+        'verification-token',
+      );
+    });
+
+    it('should handle email conflicts when updating team member', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+      };
+
+      const mockTeamMember = {
+        id: 'team-user-1',
+        email: 'team@test.com',
+        name: 'Team Member',
+        companyId: 'company-1',
+        mainUser: false,
+        status: 'active',
+      };
+
+      const existingUser = {
+        id: 'user-2',
+        email: 'existing@test.com',
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(mockTeamMember)
+        .mockResolvedValueOnce(existingUser); // Email check (exists)
+
+      await expect(
+        service.updateTeamMember('main-user-1', 'team-user-1', {
+          email: 'existing@test.com',
+        }),
+      ).rejects.toThrow('User with this email already exists');
+    });
+
+    it('should not change email when same email is provided for team member', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+      };
+
+      const mockTeamMember = {
+        id: 'team-user-1',
+        email: 'team@test.com',
+        name: 'Team Member',
+        companyId: 'company-1',
+        mainUser: false,
+        status: 'active',
+      };
+
+      const updateDto = {
+        email: 'team@test.com', // Same email
+        name: 'Updated Team Member',
+      };
+
+      const updatedUser = { ...mockTeamMember, ...updateDto };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(mockTeamMember);
+      mockPrismaService.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateTeamMember(
+        'main-user-1',
+        'team-user-1',
+        updateDto,
+      );
+
+      expect(result).toEqual(updatedUser);
+      expect(
+        mockAuthService.generateEmailVerificationToken,
+      ).not.toHaveBeenCalled();
+      expect(mockEmailService.sendEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it('should handle CPF with whitespace correctly for team member', async () => {
+      const mockMainUser = {
+        id: 'main-user-1',
+        email: 'main@test.com',
+        companyId: 'company-1',
+        mainUser: true,
+        status: 'active',
+      };
+
+      const mockTeamMember = {
+        id: 'team-user-1',
+        email: 'team@test.com',
+        name: 'Team Member',
+        companyId: 'company-1',
+        mainUser: false,
+        status: 'active',
+        cpf: '123.456.789-00',
+      };
+
+      const updateDto = {
+        cpf: '   ', // Whitespace only
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockMainUser)
+        .mockResolvedValueOnce(mockTeamMember);
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockTeamMember,
+        cpf: null,
+      });
+
+      await service.updateTeamMember('main-user-1', 'team-user-1', updateDto);
+
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'team-user-1' },
+        data: {
+          ...updateDto,
+          cpf: null,
+        },
+        select: expect.any(Object),
+      });
     });
   });
 

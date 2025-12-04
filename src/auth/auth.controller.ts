@@ -100,6 +100,23 @@ export class AuthController {
     return this.authService.verifyEmail(verifyEmailDto.token);
   }
 
+  @Post('setup-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Setup password and verify email (for team members)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password set and email verified successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  async setupPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.setupPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
+  }
+
   @Post('resend-verification')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

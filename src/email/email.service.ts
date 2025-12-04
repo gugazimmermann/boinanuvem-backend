@@ -111,7 +111,7 @@ Se você não solicitou este e-mail, pode ignorá-lo com segurança.
     name: string,
     token: string,
   ): Promise<void> {
-    const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${token}`;
+    const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verificar-email?token=${token}`;
 
     const content = `
       Olá ${name},
@@ -197,7 +197,7 @@ Se você não solicitou este e-mail, pode ignorá-lo com segurança.
     companyName: string,
     token: string,
   ): Promise<void> {
-    const invitationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${token}`;
+    const invitationUrl = `${this.configService.get('FRONTEND_URL')}/configurar-senha?token=${token}`;
 
     const content = `
       Olá!
@@ -206,7 +206,7 @@ Se você não solicitou este e-mail, pode ignorá-lo com segurança.
       
       O Boi na Nuvem é uma plataforma completa para gestão de rebanho bovino, oferecendo ferramentas modernas para otimizar seu agronegócio.
       
-      Clique no botão abaixo para aceitar o convite e criar sua conta:
+      Clique no botão abaixo para configurar sua senha e ativar sua conta:
     `;
 
     const { html, text } = this.createEmailTemplate(

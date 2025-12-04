@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/services/prisma.service';
 import { TrialService } from '../common/services/trial.service';
+import { EmailService } from '../email/email.service';
 
 interface ValidatedUser {
   id: string;
@@ -25,6 +26,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private trialService: TrialService,
+    private emailService: EmailService,
   ) {}
 
   async validateUser(
@@ -278,7 +280,13 @@ export class AuthService {
   async verifyEmail(token: string) {
     const verification = await this.prisma.emailVerification.findUnique({
       where: { token },
-      include: { user: true },
+      include: {
+        user: {
+          include: {
+            company: true,
+          },
+        },
+      },
     });
 
     if (
@@ -288,6 +296,10 @@ export class AuthService {
     ) {
       throw new BadRequestException('Invalid or expired verification token');
     }
+
+    // Check if this is the first email verification (emailVerifiedAt is null)
+    const isFirstVerification = !verification.user.emailVerifiedAt;
+    const isMainUser = verification.user.mainUser;
 
     // Mark token as used
     await this.prisma.emailVerification.update({
@@ -305,7 +317,77 @@ export class AuthService {
       },
     });
 
+    // Send welcome email only for main users on their first email verification
+    if (isFirstVerification && isMainUser && verification.user.company) {
+      await this.emailService.sendWelcomeEmail(
+        verification.user.company.email,
+        verification.user.name,
+        verification.user.company.companyName,
+      );
+    }
+
     return { message: 'Email verified successfully' };
+  }
+
+  async setupPassword(token: string, password: string) {
+    const verification = await this.prisma.emailVerification.findUnique({
+      where: { token },
+      include: {
+        user: {
+          include: {
+            company: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !verification ||
+      verification.expiresAt < new Date() ||
+      verification.usedAt
+    ) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    // Check if this is the first email verification (emailVerifiedAt is null)
+    const isFirstVerification = !verification.user.emailVerifiedAt;
+    const isMainUser = verification.user.mainUser;
+
+    // Mark token as used
+    await this.prisma.emailVerification.update({
+      where: { id: verification.id },
+      data: { usedAt: new Date() },
+    });
+
+    // Hash the new password
+    const hashedPassword = await this.hashPassword(password);
+
+    // Update user: verify email, set password, and activate account
+    await this.prisma.user.update({
+      where: { id: verification.userId },
+      data: {
+        status: 'active',
+        emailVerifiedAt: new Date(),
+        email: verification.email, // In case email was changed
+        password: hashedPassword,
+      },
+    });
+
+    // Invalidate all refresh tokens for security
+    await this.prisma.refreshToken.deleteMany({
+      where: { userId: verification.userId },
+    });
+
+    // Send welcome email only for main users on their first email verification
+    if (isFirstVerification && isMainUser && verification.user.company) {
+      await this.emailService.sendWelcomeEmail(
+        verification.user.company.email,
+        verification.user.name,
+        verification.user.company.companyName,
+      );
+    }
+
+    return { message: 'Password set and email verified successfully' };
   }
 
   async generatePasswordResetToken(email: string): Promise<string> {

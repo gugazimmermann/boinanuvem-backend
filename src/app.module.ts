@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
 import { EmailModule } from './email/email.module';
+import { PaymentsModule } from './payments/payments.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -42,6 +43,7 @@ import securityConfig from './common/config/security.config';
     CompaniesModule,
     UsersModule,
     EmailModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [

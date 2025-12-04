@@ -6,26 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-
-export interface CreatePaymentDto {
-  companyId: string;
-  subscriptionId?: string;
-  amount: number;
-  currency?: string;
-  paymentMethod?: string;
-  dueDate: Date;
-  description?: string;
-  externalId?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface UpdatePaymentDto {
-  status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
-  paymentDate?: Date;
-  paymentMethod?: string;
-  externalId?: string;
-  metadata?: Record<string, any>;
-}
+import { CreatePaymentDto, UpdatePaymentDto, PaymentStatus } from './dto';
 
 @Injectable()
 export class PaymentsService {
@@ -201,7 +182,7 @@ export class PaymentsService {
     return this.updatePayment(
       paymentId,
       {
-        status: 'paid',
+        status: PaymentStatus.PAID,
         paymentDate: paymentDate ?? new Date(),
       },
       userId,
@@ -215,7 +196,7 @@ export class PaymentsService {
     return this.updatePayment(
       paymentId,
       {
-        status: 'failed',
+        status: PaymentStatus.FAILED,
       },
       userId,
     );
@@ -234,7 +215,7 @@ export class PaymentsService {
     return this.updatePayment(
       paymentId,
       {
-        status: 'cancelled',
+        status: PaymentStatus.CANCELLED,
       },
       userId,
     );

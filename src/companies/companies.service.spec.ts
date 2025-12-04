@@ -222,6 +222,54 @@ describe('CompaniesService', () => {
       });
     });
 
+    it('should skip email validation if email is not provided', async () => {
+      const registerDtoWithoutEmail: RegisterCompanyDto = {
+        ...registerDto,
+        email: undefined as any,
+      };
+
+      prismaService.company.findUnique.mockImplementation((args: any) => {
+        if (args.where.cnpj) {
+          return Promise.resolve(null);
+        }
+        // Should not check email if it's undefined
+        return Promise.resolve(null);
+      });
+
+      prismaService.user.findUnique.mockResolvedValue(null);
+
+      const mockTransaction = {
+        company: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockCompany),
+        },
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockUser),
+        },
+        plan: {
+          findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
+        },
+        companySubscription: {
+          create: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      prismaService.$transaction.mockImplementation((callback) => {
+        return callback(mockTransaction as any);
+      });
+
+      await service.registerCompany(registerDtoWithoutEmail);
+
+      // Should not call findUnique with email
+      expect(prismaService.company.findUnique).toHaveBeenCalledWith({
+        where: { cnpj: registerDtoWithoutEmail.cnpj },
+      });
+      expect(prismaService.company.findUnique).not.toHaveBeenCalledWith({
+        where: { email: undefined },
+      });
+    });
+
     it('should throw ConflictException if user email already exists', async () => {
       // Mock company findUnique to return null (no conflicts)
       prismaService.company.findUnique.mockResolvedValue(null);
@@ -251,6 +299,54 @@ describe('CompaniesService', () => {
       });
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: registerDto.userEmail },
+      });
+    });
+
+    it('should use company address fields as fallback for user address', async () => {
+      const registerDtoWithoutUserAddress: RegisterCompanyDto = {
+        ...registerDto,
+        userStreet: undefined,
+        userNumber: undefined,
+        userComplement: undefined,
+        userNeighborhood: undefined,
+        userCity: undefined,
+        userState: undefined,
+        userZipCode: undefined,
+      };
+
+      const mockTransaction = {
+        company: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockCompany),
+        },
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(mockUser),
+        },
+        plan: {
+          findUnique: jest.fn().mockResolvedValue(mockAdvancedPlan),
+        },
+        companySubscription: {
+          create: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      prismaService.$transaction.mockImplementation((callback) => {
+        return callback(mockTransaction as any);
+      });
+
+      await service.registerCompany(registerDtoWithoutUserAddress);
+
+      expect(mockTransaction.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          street: registerDtoWithoutUserAddress.street,
+          number: registerDtoWithoutUserAddress.number,
+          complement: registerDtoWithoutUserAddress.complement ?? null,
+          neighborhood: registerDtoWithoutUserAddress.neighborhood,
+          city: registerDtoWithoutUserAddress.city,
+          state: registerDtoWithoutUserAddress.state,
+          zipCode: registerDtoWithoutUserAddress.zipCode,
+        }),
       });
     });
 
