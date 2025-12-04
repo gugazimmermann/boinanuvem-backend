@@ -77,7 +77,33 @@ describe('AuthController', () => {
         loginDto.email,
         loginDto.password,
       );
-      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, false);
+      expect(result).toEqual(mockLoginResult);
+    });
+
+    it('should login a user with rememberMe true', async () => {
+      const loginDto = {
+        email: 'test@example.com',
+        password: 'password123',
+        rememberMe: true,
+      };
+      const mockUser = {
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+      const mockLoginResult = {
+        access_token: 'token',
+        refresh_token: 'refresh',
+        user: mockUser,
+      };
+
+      mockAuthService.validateUser.mockResolvedValue(mockUser);
+      mockAuthService.login.mockResolvedValue(mockLoginResult);
+
+      const result = await controller.login(loginDto);
+
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, true);
       expect(result).toEqual(mockLoginResult);
     });
 

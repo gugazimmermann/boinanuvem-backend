@@ -75,7 +75,10 @@ export class AuthService {
     return result as ValidatedUser;
   }
 
-  async login(user: ValidatedUser): Promise<unknown> {
+  async login(
+    user: ValidatedUser,
+    rememberMe: boolean = false,
+  ): Promise<unknown> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -83,11 +86,15 @@ export class AuthService {
       mainUser: user.mainUser,
     };
 
+    // Set access token expiration based on rememberMe
+    // Remember Me ON: 30 days, Remember Me OFF: 7 days
+    const accessTokenExpiration = rememberMe ? '30d' : '7d';
+
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '7d',
+      expiresIn: accessTokenExpiration,
     });
 
-    const refreshToken = await this.generateRefreshToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id, rememberMe);
 
     // Enhance company data with trial information
     const enhancedCompany = (await this.enhanceCompanyWithTrialInfo(
@@ -140,6 +147,9 @@ export class AuthService {
       throw new UnauthorizedException('User account is not active');
     }
 
+    // Read rememberMe from the existing token record to maintain expiration times
+    const rememberMe = tokenRecord.rememberMe;
+
     // Generate new tokens
     const payload: JwtPayload = {
       sub: tokenRecord.user.id,
@@ -148,12 +158,17 @@ export class AuthService {
       mainUser: tokenRecord.user.mainUser,
     };
 
+    // Set access token expiration based on rememberMe
+    // Remember Me ON: 30 days, Remember Me OFF: 7 days
+    const accessTokenExpiration = rememberMe ? '30d' : '7d';
+
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '7d',
+      expiresIn: accessTokenExpiration,
     });
 
     const newRefreshToken = await this.generateRefreshToken(
       tokenRecord.user.id,
+      rememberMe,
     );
 
     // Remove old refresh token
@@ -197,20 +212,29 @@ export class AuthService {
     }
   }
 
-  async generateRefreshToken(userId: string): Promise<string> {
+  async generateRefreshToken(
+    userId: string,
+    rememberMe: boolean = false,
+  ): Promise<string> {
+    // Set refresh token expiration based on rememberMe
+    // Remember Me ON: 90 days, Remember Me OFF: 30 days
+    const refreshTokenExpiration = rememberMe ? '90d' : '30d';
+    const expiresInDays = rememberMe ? 90 : 30;
+
     const token = this.jwtService.sign(
       { sub: userId, type: 'refresh', iat: Date.now() },
-      { expiresIn: '30d' },
+      { expiresIn: refreshTokenExpiration },
     );
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
     await this.prisma.refreshToken.create({
       data: {
         token,
         userId,
         expiresAt,
+        rememberMe,
       },
     });
 

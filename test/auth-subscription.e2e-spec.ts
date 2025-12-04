@@ -102,6 +102,71 @@ describe('Authentication with Subscription Model (e2e)', () => {
       expect(currentSubscription).toHaveProperty('isTrial', true);
       expect(currentSubscription).toHaveProperty('isActive', true);
     });
+
+    it('should login with rememberMe false and use default token expiration', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { password: hashedPassword },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: testUser.email,
+          password: 'password123',
+          rememberMe: false,
+        })
+        .expect(200);
+
+      expect(loginResponse.body).toHaveProperty('access_token');
+      expect(loginResponse.body).toHaveProperty('refresh_token');
+
+      // Verify refresh token has rememberMe false
+      const refreshTokenRecord = await prisma.refreshToken.findFirst({
+        where: { token: loginResponse.body.refresh_token },
+      });
+
+      expect(refreshTokenRecord).toBeDefined();
+      expect(refreshTokenRecord?.rememberMe).toBe(false);
+    });
+
+    it('should login with rememberMe true and use extended token expiration', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { password: hashedPassword },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: testUser.email,
+          password: 'password123',
+          rememberMe: true,
+        })
+        .expect(200);
+
+      expect(loginResponse.body).toHaveProperty('access_token');
+      expect(loginResponse.body).toHaveProperty('refresh_token');
+
+      // Verify refresh token has rememberMe true
+      const refreshTokenRecord = await prisma.refreshToken.findFirst({
+        where: { token: loginResponse.body.refresh_token },
+      });
+
+      expect(refreshTokenRecord).toBeDefined();
+      expect(refreshTokenRecord?.rememberMe).toBe(true);
+
+      // Verify expiration is 90 days from now (approximately)
+      const expectedExpiration = new Date();
+      expectedExpiration.setDate(expectedExpiration.getDate() + 90);
+      const expirationDiff = Math.abs(
+        expectedExpiration.getTime() - refreshTokenRecord!.expiresAt.getTime(),
+      );
+      // Allow 1 minute difference for test execution time
+      expect(expirationDiff).toBeLessThan(60 * 1000);
+    });
   });
 
   describe('POST /auth/refresh', () => {
@@ -140,6 +205,85 @@ describe('Authentication with Subscription Model (e2e)', () => {
       expect(user.company).toHaveProperty('trial');
       expect(user.company).toHaveProperty('currentPlan');
       expect(user.company).toHaveProperty('currentSubscription');
+    });
+
+    it('should maintain rememberMe state when refreshing token (rememberMe false)', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { password: hashedPassword },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: testUser.email,
+          password: 'password123',
+          rememberMe: false,
+        })
+        .expect(200);
+
+      const { refresh_token } = loginResponse.body;
+
+      // Refresh the token
+      const refreshResponse = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refresh_token,
+        })
+        .expect(200);
+
+      // Verify new refresh token maintains rememberMe false
+      const newRefreshTokenRecord = await prisma.refreshToken.findFirst({
+        where: { token: refreshResponse.body.refresh_token },
+      });
+
+      expect(newRefreshTokenRecord).toBeDefined();
+      expect(newRefreshTokenRecord?.rememberMe).toBe(false);
+    });
+
+    it('should maintain rememberMe state when refreshing token (rememberMe true)', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { password: hashedPassword },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: testUser.email,
+          password: 'password123',
+          rememberMe: true,
+        })
+        .expect(200);
+
+      const { refresh_token } = loginResponse.body;
+
+      // Refresh the token
+      const refreshResponse = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refresh_token,
+        })
+        .expect(200);
+
+      // Verify new refresh token maintains rememberMe true
+      const newRefreshTokenRecord = await prisma.refreshToken.findFirst({
+        where: { token: refreshResponse.body.refresh_token },
+      });
+
+      expect(newRefreshTokenRecord).toBeDefined();
+      expect(newRefreshTokenRecord?.rememberMe).toBe(true);
+
+      // Verify expiration is still 90 days
+      const expectedExpiration = new Date();
+      expectedExpiration.setDate(expectedExpiration.getDate() + 90);
+      const expirationDiff = Math.abs(
+        expectedExpiration.getTime() -
+          newRefreshTokenRecord!.expiresAt.getTime(),
+      );
+      expect(expirationDiff).toBeLessThan(60 * 1000);
     });
   });
 

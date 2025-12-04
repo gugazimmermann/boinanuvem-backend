@@ -65,7 +65,7 @@ export class AuthController {
     }
 
     // TypeScript knows user is not null here, but needs explicit typing
-    return this.authService.login(user);
+    return this.authService.login(user, loginDto.rememberMe ?? false);
   }
 
   @Post('refresh')

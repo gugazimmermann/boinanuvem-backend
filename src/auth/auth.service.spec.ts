@@ -310,7 +310,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should generate JWT with correct payload', async () => {
+    it('should generate JWT with correct payload and default expiration', async () => {
       await service.login(mockUser);
 
       expect(jwtService.sign).toHaveBeenCalledWith(
@@ -322,6 +322,30 @@ describe('AuthService', () => {
         },
         { expiresIn: '7d' },
       );
+    });
+
+    it('should generate JWT with extended expiration when rememberMe is true', async () => {
+      await service.login(mockUser, true);
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        {
+          sub: 'user-1',
+          email: 'test@example.com',
+          companyId: 'company-1',
+          mainUser: true,
+        },
+        { expiresIn: '30d' },
+      );
+    });
+
+    it('should call generateRefreshToken with rememberMe flag', async () => {
+      const generateRefreshTokenSpy = jest
+        .spyOn(service, 'generateRefreshToken')
+        .mockImplementation(() => Promise.resolve('mock-refresh-token'));
+
+      await service.login(mockUser, true);
+
+      expect(generateRefreshTokenSpy).toHaveBeenCalledWith('user-1', true);
     });
 
     it('should enhance company data with trial information', async () => {
@@ -392,6 +416,7 @@ describe('AuthService', () => {
       id: 'token-1',
       token: 'refresh-token',
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day from now
+      rememberMe: false,
       user: {
         id: 'user-1',
         email: 'test@example.com',
@@ -522,6 +547,118 @@ describe('AuthService', () => {
               },
             },
           },
+        },
+      });
+    });
+
+    it('should maintain rememberMe state when refreshing token (rememberMe false)', async () => {
+      const tokenRecordWithoutRememberMe = {
+        ...mockTokenRecord,
+        rememberMe: false,
+      };
+      prismaService.refreshToken.findUnique.mockResolvedValue(
+        tokenRecordWithoutRememberMe,
+      );
+      prismaService.refreshToken.delete.mockResolvedValue({});
+
+      const generateRefreshTokenSpy = jest
+        .spyOn(service, 'generateRefreshToken')
+        .mockImplementation(() => Promise.resolve('new-refresh-token'));
+
+      await service.refreshToken('valid-token');
+
+      expect(jwtService.sign).toHaveBeenCalledWith(expect.any(Object), {
+        expiresIn: '7d',
+      });
+      expect(generateRefreshTokenSpy).toHaveBeenCalledWith('user-1', false);
+    });
+
+    it('should maintain rememberMe state when refreshing token (rememberMe true)', async () => {
+      const tokenRecordWithRememberMe = {
+        ...mockTokenRecord,
+        rememberMe: true,
+      };
+      prismaService.refreshToken.findUnique.mockResolvedValue(
+        tokenRecordWithRememberMe,
+      );
+      prismaService.refreshToken.delete.mockResolvedValue({});
+
+      const generateRefreshTokenSpy = jest
+        .spyOn(service, 'generateRefreshToken')
+        .mockImplementation(() => Promise.resolve('new-refresh-token'));
+
+      await service.refreshToken('valid-token');
+
+      expect(jwtService.sign).toHaveBeenCalledWith(expect.any(Object), {
+        expiresIn: '30d',
+      });
+      expect(generateRefreshTokenSpy).toHaveBeenCalledWith('user-1', true);
+    });
+  });
+
+  describe('generateRefreshToken', () => {
+    beforeEach(() => {
+      jwtService.sign.mockReturnValue('refresh-token');
+    });
+
+    it('should generate refresh token with default expiration (30 days) when rememberMe is false', async () => {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      prismaService.refreshToken.create.mockResolvedValue({
+        id: 'token-1',
+        token: 'refresh-token',
+        userId: 'user-1',
+        expiresAt,
+        rememberMe: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.generateRefreshToken('user-1', false);
+
+      expect(result).toBe('refresh-token');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: 'user-1', type: 'refresh', iat: expect.any(Number) },
+        { expiresIn: '30d' },
+      );
+      expect(prismaService.refreshToken.create).toHaveBeenCalledWith({
+        data: {
+          token: 'refresh-token',
+          userId: 'user-1',
+          expiresAt: expect.any(Date),
+          rememberMe: false,
+        },
+      });
+    });
+
+    it('should generate refresh token with extended expiration (90 days) when rememberMe is true', async () => {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 90);
+
+      prismaService.refreshToken.create.mockResolvedValue({
+        id: 'token-1',
+        token: 'refresh-token',
+        userId: 'user-1',
+        expiresAt,
+        rememberMe: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.generateRefreshToken('user-1', true);
+
+      expect(result).toBe('refresh-token');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: 'user-1', type: 'refresh', iat: expect.any(Number) },
+        { expiresIn: '90d' },
+      );
+      expect(prismaService.refreshToken.create).toHaveBeenCalledWith({
+        data: {
+          token: 'refresh-token',
+          userId: 'user-1',
+          expiresAt: expect.any(Date),
+          rememberMe: true,
         },
       });
     });
