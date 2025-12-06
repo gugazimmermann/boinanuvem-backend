@@ -121,7 +121,8 @@ export class PropertiesService {
 
     // If code is being updated, check for conflicts
     if (
-      updatePropertyDto.code &&
+      updatePropertyDto.code !== undefined &&
+      updatePropertyDto.code !== null &&
       updatePropertyDto.code !== existingProperty.code
     ) {
       await this.validateCodeConflict(
