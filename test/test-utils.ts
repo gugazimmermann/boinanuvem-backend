@@ -102,6 +102,24 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   }
 
   try {
+    await prisma.property.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    console.log('Property table not found, skipping cleanup');
+  }
+
+  try {
     await prisma.company.deleteMany({
       where: {
         OR: [
@@ -355,12 +373,17 @@ export async function createTestCompany(
     },
   });
 
-  // Create main user
+  // Create main user with unique email based on company email
   const hashedPassword = await bcrypt.hash('password123', 10);
+  // Extract domain and create unique user email
+  const emailDomain = email.split('@')[1];
+  const emailPrefix = email.split('@')[0];
+  // Use company email prefix to ensure uniqueness
+  const userEmail = `user-${emailPrefix}@${emailDomain}`;
   const user = await prisma.user.create({
     data: {
       name: 'Test User',
-      email: `user@${email.split('@')[1]}`,
+      email: userEmail,
       phone: '(47) 99999-8888',
       password: hashedPassword,
       companyId: company.id,

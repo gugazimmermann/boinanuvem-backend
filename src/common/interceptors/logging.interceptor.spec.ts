@@ -87,7 +87,7 @@ describe('LoggingInterceptor', () => {
               url: '/api/test',
               ip: '192.168.1.1',
               userAgent: 'Mozilla/5.0 (Test Browser)',
-              requestId: expect.stringMatching(/^req_\d+_[a-z0-9]{9}$/),
+              requestId: expect.stringMatching(/^req_\d+_[A-Za-z0-9_-]{8}$/),
             }),
             'HTTP',
           );
@@ -100,7 +100,7 @@ describe('LoggingInterceptor', () => {
               url: '/api/test',
               statusCode: 200,
               duration: expect.stringMatching(/^\d+ms$/),
-              requestId: expect.stringMatching(/^req_\d+_[a-z0-9]{9}$/),
+              requestId: expect.stringMatching(/^req_\d+_[A-Za-z0-9_-]{8}$/),
             }),
             'HTTP',
           );
@@ -160,7 +160,7 @@ describe('LoggingInterceptor', () => {
               duration: expect.stringMatching(/^\d+ms$/),
               error: 'Test error message',
               stack: 'Error: Test error message\n    at test.js:1:1',
-              requestId: expect.stringMatching(/^req_\d+_[a-z0-9]{9}$/),
+              requestId: expect.stringMatching(/^req_\d+_[A-Za-z0-9_-]{8}$/),
             }),
             'Error: Test error message\n    at test.js:1:1',
             'HTTP',
@@ -301,7 +301,7 @@ describe('LoggingInterceptor', () => {
       result.subscribe({
         next: () => {
           const requestWithId = mockRequest as Request & { requestId: string };
-          expect(requestWithId.requestId).toMatch(/^req_\d+_[a-z0-9]{9}$/);
+          expect(requestWithId.requestId).toMatch(/^req_\d+_[A-Za-z0-9_-]{8}$/);
           done();
         },
         error: done,
@@ -312,8 +312,8 @@ describe('LoggingInterceptor', () => {
       const id1 = (interceptor as any).generateRequestId();
       const id2 = (interceptor as any).generateRequestId();
 
-      expect(id1).toMatch(/^req_\d+_[a-z0-9]{9}$/);
-      expect(id2).toMatch(/^req_\d+_[a-z0-9]{9}$/);
+      expect(id1).toMatch(/^req_\d+_[A-Za-z0-9_-]{8}$/);
+      expect(id2).toMatch(/^req_\d+_[A-Za-z0-9_-]{8}$/);
       expect(id1).not.toBe(id2);
     });
 

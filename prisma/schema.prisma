@@ -55,6 +55,12 @@ model Company {
   users         User[]
   subscriptions CompanySubscription[]
   payments      CompanyPayment[]
+  properties    Property[]
+  locations     Location[]
+  employees     Employee[]
+  serviceProviders ServiceProvider[]
+  suppliers     Supplier[]
+  buyers        Buyer[]
 
   @@map("companies")
 }
@@ -181,4 +187,253 @@ model CompanyPayment {
   subscription   CompanySubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("company_payments")
+}
+
+model Property {
+  id                            String   @id @default(cuid())
+  code                          String
+  name                          String
+  area                          Json     // Store area as JSON: { value: number, type: string }
+  status                        String   @default("active") // "active" or "inactive"
+  companyId                     String
+  street                        String
+  number                        String
+  complement                    String?
+  neighborhood                  String
+  city                          String
+  state                         String
+  zipCode                       String
+  latitude                      Float?
+  longitude                     Float?
+  pasturePlanning               Json?    // Store pasture planning as JSON array
+  breedingMonths                Json?    // Store breeding months as JSON array
+  pasturePlanningModifiedByUser Boolean  @default(false)
+  breedingSeasonModifiedByUser  Boolean  @default(false)
+  deletedAt                     DateTime? // Soft delete timestamp
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  // Relations
+  company                       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  locations                     Location[]
+  employeeProperties            EmployeeProperty[]
+  serviceProviderProperties     ServiceProviderProperty[]
+  supplierProperties            SupplierProperty[]
+  buyerProperties               BuyerProperty[]
+
+  @@unique([companyId, code], name: "unique_property_code_per_company")
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("properties")
+}
+
+model Location {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  locationType  String   // pasture, barn, storage, corral, silo, field, paddock, feedlot, semi_feedlot, milking_parlor, warehouse, garage, office, residence, other
+  area          Json     // Store area as JSON: { value: number, type: string }
+  status        String   @default("active") // "active" or "inactive"
+  companyId     String
+  propertyId    String
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, propertyId, code], name: "unique_location_code_per_company_property")
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("locations")
+}
+
+model Employee {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  cpf           String?
+  email         String?
+  phone         String?
+  status        String   @default("active") // "active" or "inactive"
+  companyId     String
+  street        String?
+  number        String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  zipCode       String?
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties    EmployeeProperty[]
+
+  @@unique([companyId, code], name: "unique_employee_code_per_company")
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("employees")
+}
+
+model EmployeeProperty {
+  id         String   @id @default(cuid())
+  employeeId String
+  propertyId String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, propertyId], name: "unique_employee_property")
+  @@index([employeeId])
+  @@index([propertyId])
+  @@map("employee_properties")
+}
+
+model ServiceProvider {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  cpf           String?
+  cnpj          String?
+  email         String?
+  phone         String?
+  status        String   @default("active") // "active" or "inactive"
+  companyId     String
+  street        String?
+  number        String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  zipCode       String?
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties    ServiceProviderProperty[]
+
+  @@unique([companyId, code], name: "unique_service_provider_code_per_company")
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("service_providers")
+}
+
+model ServiceProviderProperty {
+  id              String   @id @default(cuid())
+  serviceProviderId String
+  propertyId      String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceProviderId, propertyId], name: "unique_service_provider_property")
+  @@index([serviceProviderId])
+  @@index([propertyId])
+  @@map("service_provider_properties")
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  cpf           String?
+  cnpj          String?
+  email         String?
+  phone         String?
+  status        String   @default("active") // "active" or "inactive"
+  companyId     String
+  street        String?
+  number        String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  zipCode       String?
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties    SupplierProperty[]
+
+  @@unique([companyId, code], name: "unique_supplier_code_per_company")
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("suppliers")
+}
+
+model SupplierProperty {
+  id         String   @id @default(cuid())
+  supplierId String
+  propertyId String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, propertyId], name: "unique_supplier_property")
+  @@index([supplierId])
+  @@index([propertyId])
+  @@map("supplier_properties")
+}
+
+model Buyer {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  cpf           String?
+  cnpj          String?
+  email         String?
+  phone         String?
+  status        String   @default("active") // "active" or "inactive"
+  companyId     String
+  street        String?
+  number        String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  zipCode       String?
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties    BuyerProperty[]
+
+  @@unique([companyId, code], name: "unique_buyer_code_per_company")
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("buyers")
+}
+
+model BuyerProperty {
+  id         String   @id @default(cuid())
+  buyerId    String
+  propertyId String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([buyerId, propertyId], name: "unique_buyer_property")
+  @@index([buyerId])
+  @@index([propertyId])
+  @@map("buyer_properties")
 }

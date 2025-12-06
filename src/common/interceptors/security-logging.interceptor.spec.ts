@@ -100,11 +100,14 @@ describe('SecurityLoggingInterceptor', () => {
         mockCallHandler as CallHandler,
       );
 
-      try {
-        result$.subscribe();
-      } catch {
-        // Expected to throw
-      }
+      result$.subscribe({
+        next: () => {
+          // Should not reach here
+        },
+        error: () => {
+          // Expected error - properly handle it
+        },
+      });
 
       expect(loggerSpy).toHaveBeenCalled();
     });

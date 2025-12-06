@@ -128,28 +128,36 @@ export class SecurityLoggingInterceptor implements NestInterceptor {
   }
 
   private containsSqlInjectionPatterns(url: string): boolean {
+    // Use non-backtracking patterns to prevent ReDoS attacks
+    // Patterns use [^\s]* instead of .* to limit backtracking
+    // Avoid nested quantifiers that can cause catastrophic backtracking
     const sqlPatterns = [
-      /(\bunion\b.*\bselect\b)/i,
-      /(\bselect\b.*\bfrom\b)/i,
-      /(\binsert\b.*\binto\b)/i,
-      /(\bdelete\b.*\bfrom\b)/i,
-      /(\bdrop\b.*\btable\b)/i,
-      /('.*or.*'.*=.*')/i,
-      /(--)/,
-      /(\bor\b.*\b1=1\b)/i,
+      /\bunion\s+\bselect/i,
+      /\bselect\s+[^\s]+\s+from/i,
+      /\binsert\s+into/i,
+      /\bdelete\s+from/i,
+      /\bdrop\s+table/i,
+      // Fixed: ReDoS-safe pattern - checks for quote-or-quote injection pattern
+      // Uses bounded quantifiers {0,50} to prevent exponential backtracking
+      // Matches patterns like: 'value' or 'value'=
+      /'[^'\s]{0,50}\s+or\s+[^'\s]{0,50}'[^=]{0,50}=/i,
+      /--/,
+      /\bor\s+1\s*=\s*1\b/i,
     ];
 
     return sqlPatterns.some((pattern) => pattern.test(url));
   }
 
   private containsXssPatterns(url: string): boolean {
+    // Use non-backtracking patterns to prevent ReDoS attacks
+    // Bounded quantifiers prevent exponential backtracking
     const xssPatterns = [
-      /<script[^>]*>.*?<\/script>/i,
+      /<script[^>]{0,200}>/i,
       /javascript:/i,
       /on\w+\s*=/i,
-      /<iframe[^>]*>/i,
-      /<object[^>]*>/i,
-      /<embed[^>]*>/i,
+      /<iframe[^>]{0,200}>/i,
+      /<object[^>]{0,200}>/i,
+      /<embed[^>]{0,200}>/i,
     ];
 
     return xssPatterns.some((pattern) => pattern.test(decodeURIComponent(url)));

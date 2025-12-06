@@ -4,9 +4,11 @@ import request, { Response } from 'supertest';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './../src/app.module';
+import { PrismaService } from '../src/common/services/prisma.service';
 
 describe('Security (e2e)', () => {
   let app: INestApplication;
+  let prisma: PrismaService;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,6 +18,8 @@ describe('Security (e2e)', () => {
     app = moduleFixture.createNestApplication({
       logger: false, // Disable NestJS logging during tests
     });
+
+    prisma = moduleFixture.get<PrismaService>(PrismaService);
 
     const configService = app.get(ConfigService);
 
@@ -55,6 +59,12 @@ describe('Security (e2e)', () => {
   afterEach(async () => {
     if (app) {
       await app.close();
+    }
+    // Ensure Prisma connection is properly closed
+    if (prisma) {
+      await prisma.$disconnect().catch(() => {
+        // Ignore errors if already disconnected
+      });
     }
   });
 

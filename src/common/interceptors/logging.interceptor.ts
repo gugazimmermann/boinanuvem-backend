@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import { randomBytes } from 'crypto';
 import { FileLoggerService } from '../logger/file-logger.service';
 
 @Injectable()
@@ -87,6 +88,8 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    // Use cryptographically secure random number generator
+    const randomPart = randomBytes(6).toString('base64url');
+    return `req_${Date.now()}_${randomPart}`;
   }
 }
