@@ -119,12 +119,18 @@ export class PropertiesService {
       companyId,
     );
 
-    await this.validateCodeConflict(
-      companyId,
-      id,
-      updatePropertyDto.code,
-      existingProperty.code,
-    );
+    // If code is being updated, check for conflicts
+    if (
+      updatePropertyDto.code &&
+      updatePropertyDto.code !== existingProperty.code
+    ) {
+      await this.validateCodeConflict(
+        companyId,
+        id,
+        updatePropertyDto.code,
+        existingProperty.code,
+      );
+    }
 
     const updateData = this.buildUpdateData(updatePropertyDto);
     const updatedProperty = await this.prisma.property.update({
@@ -252,7 +258,7 @@ export class PropertiesService {
     key: string,
     value: unknown,
   ): void {
-    if (value) {
+    if (value !== undefined && value !== null) {
       data[key] = value;
     }
   }
