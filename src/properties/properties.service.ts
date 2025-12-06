@@ -123,6 +123,7 @@ export class PropertiesService {
     if (
       updatePropertyDto.code !== undefined &&
       updatePropertyDto.code !== null &&
+      updatePropertyDto.code !== '' &&
       updatePropertyDto.code !== existingProperty.code
     ) {
       await this.validateCodeConflict(
@@ -216,7 +217,14 @@ export class PropertiesService {
   private buildUpdateData(updatePropertyDto: UpdatePropertyDto) {
     const data: Record<string, unknown> = {};
 
-    this.addIfDefined(data, 'code', updatePropertyDto.code);
+    // Code must not be empty string (MinLength(1) validation)
+    if (
+      updatePropertyDto.code !== undefined &&
+      updatePropertyDto.code !== null &&
+      updatePropertyDto.code !== ''
+    ) {
+      data.code = updatePropertyDto.code;
+    }
     this.addIfDefined(data, 'name', updatePropertyDto.name);
     this.addIfDefined(data, 'status', updatePropertyDto.status);
     this.addIfDefined(data, 'street', updatePropertyDto.street);
