@@ -324,6 +324,53 @@ describe('Locations Management Flow (e2e)', () => {
         })
         .expect(400);
     });
+
+    it('should transform area.value from string to number', async () => {
+      // This test verifies that @Type(() => Number) decorator works correctly
+      // When JSON is parsed, numbers can come as strings, and they should be transformed
+      const dto = {
+        ...createLocationDto,
+        code: '006',
+        propertyId: testProperty.id,
+        area: { value: '42.5' as any, type: 'hectares' }, // Send as string
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/locations')
+        .set('Authorization', `Bearer ${mainUserToken}`)
+        .send(dto)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        code: dto.code,
+        name: dto.name,
+        locationType: dto.locationType,
+        status: dto.status,
+        companyId: testCompany.id,
+        propertyId: testProperty.id,
+      });
+      expect(response.body.id).toBeDefined();
+      expect(response.body.createdAt).toBeDefined();
+      // Verify the area was stored correctly (value should be a number)
+      expect(response.body.area).toBeDefined();
+      expect(typeof response.body.area.value).toBe('number');
+      expect(response.body.area.value).toBe(42.5);
+    });
+
+    it('should reject invalid area.value (non-numeric string)', async () => {
+      const dto = {
+        ...createLocationDto,
+        code: '007',
+        propertyId: testProperty.id,
+        area: { value: 'not-a-number' as any, type: 'hectares' },
+      };
+
+      await request(app.getHttpServer())
+        .post('/locations')
+        .set('Authorization', `Bearer ${mainUserToken}`)
+        .send(dto)
+        .expect(400);
+    });
   });
 
   describe('GET /locations', () => {
@@ -619,6 +666,64 @@ describe('Locations Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.propertyId).toBe(otherProperty.id);
+    });
+
+    it('should transform area.value from string to number when updating', async () => {
+      // This test verifies that @Type(() => Number) decorator works correctly for updates
+      const updateDto = {
+        area: { value: '50.75' as any, type: 'hectares' }, // Send as string
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/locations/${locationId}`)
+        .set('Authorization', `Bearer ${mainUserToken}`)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body.area).toBeDefined();
+      expect(typeof response.body.area.value).toBe('number');
+      expect(response.body.area.value).toBe(50.75);
+    });
+
+    it('should update location with all fields including area transformation', async () => {
+      // Comprehensive test for editing location with all fields
+      const updateDto = {
+        name: 'Updated Location Name',
+        code: 'UPD-001',
+        locationType: 'barn',
+        status: 'inactive',
+        area: { value: '75.25' as any, type: 'square_meters' }, // Send as string
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/locations/${locationId}`)
+        .set('Authorization', `Bearer ${mainUserToken}`)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: locationId,
+        name: 'Updated Location Name',
+        code: 'UPD-001',
+        locationType: 'barn',
+        status: 'inactive',
+      });
+      expect(response.body.area).toBeDefined();
+      expect(typeof response.body.area.value).toBe('number');
+      expect(response.body.area.value).toBe(75.25);
+      expect(response.body.area.type).toBe('square_meters');
+    });
+
+    it('should reject invalid area.value when updating', async () => {
+      const updateDto = {
+        area: { value: 'invalid-number' as any, type: 'hectares' },
+      };
+
+      await request(app.getHttpServer())
+        .put(`/locations/${locationId}`)
+        .set('Authorization', `Bearer ${mainUserToken}`)
+        .send(updateDto)
+        .expect(400);
     });
   });
 

@@ -38,6 +38,7 @@ enum LocationType {
 
 class AreaDto {
   @ApiProperty({ example: 28.5 })
+  @Type(() => Number)
   @IsNumber()
   value: number;
 
