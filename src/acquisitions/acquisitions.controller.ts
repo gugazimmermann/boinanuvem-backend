@@ -39,7 +39,7 @@ export class AcquisitionsController {
   @Post()
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -61,7 +61,7 @@ export class AcquisitionsController {
   @Get()
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'view',
   })
   @ApiOperation({
@@ -80,7 +80,7 @@ export class AcquisitionsController {
   @Get(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get an acquisition record by ID' })
@@ -98,7 +98,7 @@ export class AcquisitionsController {
   @Get('animal/:animalId')
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get an acquisition record by animal ID' })
@@ -119,7 +119,7 @@ export class AcquisitionsController {
   @Put(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update an acquisition record' })
@@ -141,7 +141,7 @@ export class AcquisitionsController {
   @Delete(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'acquisition',
+    resource: 'acquisitions',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

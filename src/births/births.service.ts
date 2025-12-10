@@ -20,28 +20,12 @@ export class BirthsService {
     );
 
     // Validate mother and father if provided
-    let motherBirth = null;
-    let fatherBirth = null;
-    let motherBreed: string | undefined;
-    let fatherBreed: string | undefined;
-
-    if (createBirthDto.motherId) {
-      await this.validateAnimalBelongsToCompany(
+    const { motherBirth, fatherBirth, motherBreed, fatherBreed } =
+      await this.processParentAnimals(
         createBirthDto.motherId,
-        companyId,
-      );
-      motherBirth = await this.findBirthByAnimalId(createBirthDto.motherId);
-      // Breed is stored on Birth, not Animal
-    }
-
-    if (createBirthDto.fatherId) {
-      await this.validateAnimalBelongsToCompany(
         createBirthDto.fatherId,
         companyId,
       );
-      fatherBirth = await this.findBirthByAnimalId(createBirthDto.fatherId);
-      // Breed is stored on Birth, not Animal
-    }
 
     // Calculate purity if not provided
     let purity = createBirthDto.purity;
@@ -198,6 +182,40 @@ export class BirthsService {
     });
 
     return { message: 'Birth record deleted successfully' };
+  }
+
+  private async processParentAnimals(
+    motherId: string | undefined,
+    fatherId: string | undefined,
+    companyId: string,
+  ): Promise<{
+    motherBirth: { purity: string | null; breed: string | null } | null;
+    fatherBirth: { purity: string | null; breed: string | null } | null;
+    motherBreed: string | undefined;
+    fatherBreed: string | undefined;
+  }> {
+    let motherBirth = null;
+    let fatherBirth = null;
+    let motherBreed: string | undefined;
+    let fatherBreed: string | undefined;
+
+    if (motherId) {
+      await this.validateAnimalBelongsToCompany(motherId, companyId);
+      motherBirth = await this.findBirthByAnimalId(motherId);
+      if (motherBirth) {
+        motherBreed = motherBirth.breed ?? undefined;
+      }
+    }
+
+    if (fatherId) {
+      await this.validateAnimalBelongsToCompany(fatherId, companyId);
+      fatherBirth = await this.findBirthByAnimalId(fatherId);
+      if (fatherBirth) {
+        fatherBreed = fatherBirth.breed ?? undefined;
+      }
+    }
+
+    return { motherBirth, fatherBirth, motherBreed, fatherBreed };
   }
 
   private async getUserCompanyId(userId: string): Promise<string> {

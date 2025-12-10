@@ -35,7 +35,7 @@ export class BirthsController {
   @Post()
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -57,7 +57,7 @@ export class BirthsController {
   @Get()
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'view',
   })
   @ApiOperation({
@@ -76,7 +76,7 @@ export class BirthsController {
   @Get(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get a birth record by ID' })
@@ -94,7 +94,7 @@ export class BirthsController {
   @Get('animal/:animalId')
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get a birth record by animal ID' })
@@ -115,7 +115,7 @@ export class BirthsController {
   @Put(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update a birth record' })
@@ -137,7 +137,7 @@ export class BirthsController {
   @Delete(':id')
   @RequirePermissions({
     section: 'records',
-    resource: 'birth',
+    resource: 'births',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

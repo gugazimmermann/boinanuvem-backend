@@ -266,5 +266,101 @@ describe('PermissionsGuard', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should return true when births permissions are granted', () => {
+      const userPermissions = {
+        records: {
+          births: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+        },
+      };
+
+      const requiredPermissions: RequiredPermission[] = [
+        { section: 'records', resource: 'births', action: 'view' },
+        { section: 'records', resource: 'births', action: 'add' },
+      ];
+
+      const result = guard['checkPermissions'](
+        userPermissions,
+        requiredPermissions,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when births permissions are denied', () => {
+      const userPermissions = {
+        records: {
+          births: {
+            view: true,
+            add: false,
+          },
+        },
+      };
+
+      const requiredPermissions: RequiredPermission[] = [
+        { section: 'records', resource: 'births', action: 'view' },
+        { section: 'records', resource: 'births', action: 'add' },
+      ];
+
+      const result = guard['checkPermissions'](
+        userPermissions,
+        requiredPermissions,
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('should return true when acquisitions permissions are granted', () => {
+      const userPermissions = {
+        records: {
+          acquisitions: {
+            view: true,
+            add: true,
+            edit: true,
+            remove: true,
+          },
+        },
+      };
+
+      const requiredPermissions: RequiredPermission[] = [
+        { section: 'records', resource: 'acquisitions', action: 'view' },
+        { section: 'records', resource: 'acquisitions', action: 'add' },
+      ];
+
+      const result = guard['checkPermissions'](
+        userPermissions,
+        requiredPermissions,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when acquisitions permissions are denied', () => {
+      const userPermissions = {
+        records: {
+          acquisitions: {
+            view: true,
+            add: false,
+          },
+        },
+      };
+
+      const requiredPermissions: RequiredPermission[] = [
+        { section: 'records', resource: 'acquisitions', action: 'view' },
+        { section: 'records', resource: 'acquisitions', action: 'add' },
+      ];
+
+      const result = guard['checkPermissions'](
+        userPermissions,
+        requiredPermissions,
+      );
+
+      expect(result).toBe(false);
+    });
   });
 });

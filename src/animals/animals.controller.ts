@@ -35,7 +35,7 @@ export class AnimalsController {
   @Post()
   @RequirePermissions({
     section: 'registration',
-    resource: 'animal',
+    resource: 'animals',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -57,7 +57,7 @@ export class AnimalsController {
   @Get()
   @RequirePermissions({
     section: 'registration',
-    resource: 'animal',
+    resource: 'animals',
     action: 'view',
   })
   @ApiOperation({
@@ -76,7 +76,7 @@ export class AnimalsController {
   @Get(':id')
   @RequirePermissions({
     section: 'registration',
-    resource: 'animal',
+    resource: 'animals',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get an animal by ID' })
@@ -94,7 +94,7 @@ export class AnimalsController {
   @Put(':id')
   @RequirePermissions({
     section: 'registration',
-    resource: 'animal',
+    resource: 'animals',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update an animal' })
@@ -117,7 +117,7 @@ export class AnimalsController {
   @Delete(':id')
   @RequirePermissions({
     section: 'registration',
-    resource: 'animal',
+    resource: 'animals',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)
