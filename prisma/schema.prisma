@@ -61,6 +61,9 @@ model Company {
   serviceProviders ServiceProvider[]
   suppliers     Supplier[]
   buyers        Buyer[]
+  animals       Animal[]
+  births        Birth[]
+  acquisitions  Acquisition[]
 
   @@map("companies")
 }
@@ -220,6 +223,8 @@ model Property {
   serviceProviderProperties     ServiceProviderProperty[]
   supplierProperties            SupplierProperty[]
   buyerProperties               BuyerProperty[]
+  animals                       Animal[]
+  acquisitions                  Acquisition[]
 
   @@unique([companyId, code], name: "unique_property_code_per_company")
   @@index([companyId])
@@ -368,6 +373,7 @@ model Supplier {
   // Relations
   company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   properties    SupplierProperty[]
+  acquisitions  Acquisition[]
 
   @@unique([companyId, code], name: "unique_supplier_code_per_company")
   @@index([companyId])
@@ -436,4 +442,119 @@ model BuyerProperty {
   @@index([buyerId])
   @@index([propertyId])
   @@map("buyer_properties")
+}
+
+model Birth {
+  id            String    @id @default(cuid())
+  animalId      String    @unique
+  birthDate     DateTime
+  breed         String?
+  gender        String?   // "male" | "female"
+  motherId      String?
+  fatherId      String?
+  purity        String?   // "po", "pc", "f1", "f2", "f3", "f4", "f5"
+  observation   String?
+  companyId     String
+  deletedAt     DateTime? // Soft delete timestamp
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal        Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  mother        Animal?   @relation("MotherBirths", fields: [motherId], references: [id], onDelete: SetNull)
+  father        Animal?   @relation("FatherBirths", fields: [fatherId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([motherId])
+  @@index([fatherId])
+  @@index([deletedAt])
+  @@map("births")
+}
+
+model Acquisition {
+  id                    String    @id @default(cuid())
+  companyId             String
+  propertyId            String
+  supplierId            String
+  acquisitionDate       DateTime
+  pricingMode           String    // "individual" | "total"
+  paymentMethod         String    // "cash_flow" | "accounts_payable"
+  totalPrice            Decimal   @db.Decimal(10, 2)
+  transportationFee     Decimal?  @db.Decimal(10, 2)
+  handlingFee           Decimal?  @db.Decimal(10, 2)
+  fees                  Json?     // Store fees as JSON: [{id: string, name: string, amount: number}]
+  linkedCashFlowId      String?
+  linkedAccountsPayableId String?
+  observation           String?
+  deletedAt             DateTime? // Soft delete timestamp
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property              Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  supplier              Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  acquisitionItems      AcquisitionItem[]
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([supplierId])
+  @@index([deletedAt])
+  @@map("acquisitions")
+}
+
+model AcquisitionItem {
+  id                      String      @id @default(cuid())
+  acquisitionId           String
+  animalId                String      @unique
+  price                   Decimal     @db.Decimal(10, 2)
+  weight                  Decimal     @db.Decimal(10, 2)
+  costPerArroba           Decimal     @db.Decimal(10, 2)
+  breed                   String?
+  gender                  String?     // "male" | "female"
+  birthDate               DateTime?
+  motherId                String?
+  fatherId                String?
+  motherRegistrationNumber String?
+  fatherRegistrationNumber String?
+  purity                  String?     // "po", "pc", "f1", "f2", "f3", "f4", "f5"
+  birthObservation        String?
+  createdAt               DateTime    @default(now())
+
+  // Relations
+  acquisition             Acquisition @relation(fields: [acquisitionId], references: [id], onDelete: Cascade)
+  animal                  Animal      @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([acquisitionId])
+  @@index([animalId])
+  @@map("acquisition_items")
+}
+
+model Animal {
+  id               String    @id @default(cuid())
+  code             String
+  registrationNumber String
+  acquisitionDate  DateTime?
+  status           String    @default("active") // "active", "inactive", "sold"
+  companyId        String
+  propertyId       String
+  deletedAt        DateTime? // Soft delete timestamp
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  birth            Birth?
+  birthsAsMother   Birth[]   @relation("MotherBirths")
+  birthsAsFather   Birth[]   @relation("FatherBirths")
+  acquisitionItem  AcquisitionItem?
+
+  @@unique([companyId, code], name: "unique_animal_code_per_company")
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("animals")
 }

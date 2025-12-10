@@ -18,6 +18,9 @@ import { EmployeesModule } from './employees/employees.module';
 import { ServiceProvidersModule } from './service-providers/service-providers.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { BuyersModule } from './buyers/buyers.module';
+import { AnimalsModule } from './animals/animals.module';
+import { BirthsModule } from './births/births.module';
+import { AcquisitionsModule } from './acquisitions/acquisitions.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -56,6 +59,9 @@ import securityConfig from './common/config/security.config';
     ServiceProvidersModule,
     SuppliersModule,
     BuyersModule,
+    AnimalsModule,
+    BirthsModule,
+    AcquisitionsModule,
   ],
   controllers: [AppController],
   providers: [
