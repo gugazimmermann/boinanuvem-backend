@@ -216,6 +216,94 @@ describe('BirthsService', () => {
 
       expect(result).toBeDefined();
     });
+
+    it('should handle parent birth record with null breed', async () => {
+      const dtoWithoutPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        purity: undefined,
+      };
+
+      const motherBirth = {
+        ...mockBirth,
+        id: 'mother-birth-1',
+        animalId: 'mother-1',
+        purity: 'po',
+        breed: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      // Order: validate mother, validate father, check existing code
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother) // Validate mother
+        .mockResolvedValueOnce(mockFather) // Validate father
+        .mockResolvedValueOnce(null); // Check for existing animal code
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(motherBirth) // Mother birth with null breed
+        .mockResolvedValueOnce(null); // Father birth
+
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        return callback({
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockResolvedValue({
+              ...mockBirth,
+              purity: 'f1',
+            }),
+          },
+        });
+      });
+
+      const result = await service.create(mockUser.id, dtoWithoutPurity);
+
+      expect(result).toBeDefined();
+    });
+
+    it('should handle father birth record with null breed', async () => {
+      const dtoWithoutPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        purity: undefined,
+      };
+
+      const fatherBirth = {
+        ...mockBirth,
+        id: 'father-birth-1',
+        animalId: 'father-1',
+        purity: 'po',
+        breed: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      // Order: validate mother, validate father, check existing code
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother) // Validate mother
+        .mockResolvedValueOnce(mockFather) // Validate father
+        .mockResolvedValueOnce(null); // Check for existing animal code
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(null) // No mother birth
+        .mockResolvedValueOnce(fatherBirth); // Father birth with null breed
+
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        return callback({
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockResolvedValue({
+              ...mockBirth,
+              purity: 'f1',
+            }),
+          },
+        });
+      });
+
+      const result = await service.create(mockUser.id, dtoWithoutPurity);
+
+      expect(result).toBeDefined();
+    });
   });
 
   describe('findAll', () => {
@@ -298,6 +386,34 @@ describe('BirthsService', () => {
         service.findByAnimalId(mockUser.id, mockAnimal.id),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should throw NotFoundException if birth belongs to different company', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      const birthFromOtherCompany = {
+        ...mockBirth,
+        companyId: 'other-company-id',
+      };
+      prismaService.birth.findUnique.mockResolvedValue(birthFromOtherCompany);
+
+      await expect(
+        service.findByAnimalId(mockUser.id, mockAnimal.id),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if birth is soft-deleted', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      const deletedBirth = {
+        ...mockBirth,
+        deletedAt: new Date(),
+      };
+      prismaService.birth.findUnique.mockResolvedValue(deletedBirth);
+
+      await expect(
+        service.findByAnimalId(mockUser.id, mockAnimal.id),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('update', () => {
@@ -351,6 +467,180 @@ describe('BirthsService', () => {
           deletedAt: null,
         },
       });
+    });
+
+    it('should validate father if being updated', async () => {
+      const updateWithFather: UpdateBirthDto = {
+        fatherId: 'new-father-1',
+      };
+
+      const newFather = { ...mockFather, id: 'new-father-1' };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.animal.findFirst.mockResolvedValue(newFather);
+      prismaService.birth.update.mockResolvedValue({
+        ...mockBirth,
+        ...updateWithFather,
+      });
+
+      await service.update(mockUser.id, mockBirth.id, updateWithFather);
+
+      expect(prismaService.animal.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'new-father-1',
+          companyId: mockUser.companyId,
+          deletedAt: null,
+        },
+      });
+    });
+
+    it('should update birthDate', async () => {
+      const updateWithDate: UpdateBirthDto = {
+        birthDate: '2020-02-20',
+      };
+
+      const updatedBirth = {
+        ...mockBirth,
+        birthDate: new Date('2020-02-20'),
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.birth.update.mockResolvedValue(updatedBirth);
+
+      const result = await service.update(
+        mockUser.id,
+        mockBirth.id,
+        updateWithDate,
+      );
+
+      expect(prismaService.birth.update).toHaveBeenCalledWith({
+        where: { id: mockBirth.id },
+        data: {
+          birthDate: new Date('2020-02-20'),
+        },
+      });
+      expect(result.birthDate).toEqual(new Date('2020-02-20'));
+    });
+
+    it('should update with null values for motherId', async () => {
+      const updateWithNullMother: UpdateBirthDto = {
+        motherId: null,
+      };
+
+      const updatedBirth = {
+        ...mockBirth,
+        motherId: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.birth.update.mockResolvedValue(updatedBirth);
+
+      const result = await service.update(
+        mockUser.id,
+        mockBirth.id,
+        updateWithNullMother,
+      );
+
+      expect(prismaService.birth.update).toHaveBeenCalledWith({
+        where: { id: mockBirth.id },
+        data: {
+          motherId: null,
+        },
+      });
+      expect(result.motherId).toBeUndefined();
+    });
+
+    it('should update with null values for fatherId', async () => {
+      const updateWithNullFather: UpdateBirthDto = {
+        fatherId: null,
+      };
+
+      const updatedBirth = {
+        ...mockBirth,
+        fatherId: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.birth.update.mockResolvedValue(updatedBirth);
+
+      const result = await service.update(
+        mockUser.id,
+        mockBirth.id,
+        updateWithNullFather,
+      );
+
+      expect(prismaService.birth.update).toHaveBeenCalledWith({
+        where: { id: mockBirth.id },
+        data: {
+          fatherId: null,
+        },
+      });
+      expect(result.fatherId).toBeUndefined();
+    });
+
+    it('should update with null values for observation', async () => {
+      const updateWithNullObservation: UpdateBirthDto = {
+        observation: null,
+      };
+
+      const updatedBirth = {
+        ...mockBirth,
+        observation: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.birth.update.mockResolvedValue(updatedBirth);
+
+      const result = await service.update(
+        mockUser.id,
+        mockBirth.id,
+        updateWithNullObservation,
+      );
+
+      expect(prismaService.birth.update).toHaveBeenCalledWith({
+        where: { id: mockBirth.id },
+        data: {
+          observation: null,
+        },
+      });
+      expect(result.observation).toBeUndefined();
+    });
+
+    it('should update multiple fields including null values', async () => {
+      const updateMultiple: UpdateBirthDto = {
+        breed: 'angus',
+        gender: 'female',
+        motherId: null,
+        fatherId: null,
+        observation: null,
+      };
+
+      const updatedBirth = {
+        ...mockBirth,
+        ...updateMultiple,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.birth.findFirst.mockResolvedValue(mockBirth);
+      prismaService.birth.update.mockResolvedValue(updatedBirth);
+
+      const result = await service.update(
+        mockUser.id,
+        mockBirth.id,
+        updateMultiple,
+      );
+
+      expect(prismaService.birth.update).toHaveBeenCalled();
+      expect(result.breed).toBe('angus');
+      expect(result.gender).toBe('female');
+      expect(result.motherId).toBeUndefined();
+      expect(result.fatherId).toBeUndefined();
+      expect(result.observation).toBeUndefined();
     });
   });
 
@@ -419,6 +709,188 @@ describe('BirthsService', () => {
       const fatherBirth = { purity: BirthPurity.F1 };
       const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
       expect(purity).toBe(BirthPurity.F2);
+    });
+
+    it('should return F2 when F1 and F1 combination', () => {
+      const motherBirth = { purity: BirthPurity.F1 };
+      const fatherBirth = { purity: BirthPurity.F1 };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F2);
+    });
+
+    it('should return F3 when PO and F2 combination', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.F2 };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F3);
+    });
+
+    it('should return F3 when F2 and PO combination', () => {
+      const motherBirth = { purity: BirthPurity.F2 };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F3);
+    });
+
+    it('should return F4 when PO and F3 combination', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.F3 };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F4);
+    });
+
+    it('should return F4 when F3 and PO combination', () => {
+      const motherBirth = { purity: BirthPurity.F3 };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F4);
+    });
+
+    it('should return F5 when PO and F4 combination', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.F4 };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F5);
+    });
+
+    it('should return F5 when F4 and PO combination', () => {
+      const motherBirth = { purity: BirthPurity.F4 };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F5);
+    });
+
+    it('should return PC when PO and F5 combination', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.F5 };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.PC);
+    });
+
+    it('should return PC when F5 and PO combination', () => {
+      const motherBirth = { purity: BirthPurity.F5 };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.PC);
+    });
+
+    it('should return PC when mother is PC', () => {
+      const motherBirth = { purity: BirthPurity.PC };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.PC);
+    });
+
+    it('should return PC when father is PC', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.PC };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.PC);
+    });
+
+    it('should return F1 when one parent missing and purity is null', () => {
+      const motherBirth = { purity: null };
+      const fatherBirth = null;
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F1);
+    });
+
+    it('should return F1 when one parent missing and no purity available', () => {
+      const motherBirth = null;
+      const fatherBirth = { purity: null };
+      const purity = (service as any).calculatePurity(motherBirth, fatherBirth);
+      expect(purity).toBe(BirthPurity.F1);
+    });
+
+    it('should return null when getPurityWhenOneMissing has no available purity', () => {
+      const result = (service as any).getPurityWhenOneMissing(null, null);
+      expect(result).toBe(BirthPurity.PO);
+    });
+
+    it('should return null when getPurityWhenOneMissing has father missing but no purity', () => {
+      const motherBirth = { purity: null };
+      const fatherBirth = null;
+      const result = (service as any).getPurityWhenOneMissing(
+        motherBirth,
+        fatherBirth,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null when getPurityWhenBothPresent has null purity', () => {
+      const motherBirth = { purity: null };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const result = (service as any).getPurityWhenBothPresent(
+        motherBirth,
+        fatherBirth,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null when getPurityWhenBothPresent has father with null purity', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: null };
+      const result = (service as any).getPurityWhenBothPresent(
+        motherBirth,
+        fatherBirth,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null when checkPOAndF5OrPCCombination has no matching combination', () => {
+      const result = (service as any).checkPOAndF5OrPCCombination(
+        BirthPurity.F1,
+        BirthPurity.F2,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null when getNextPurity is called with PC', () => {
+      const nextPurity = (service as any).getNextPurity(BirthPurity.PC);
+      expect(nextPurity).toBeNull();
+    });
+
+    it('should return F1 when getNextPurity is called with PO', () => {
+      const nextPurity = (service as any).getNextPurity(BirthPurity.PO);
+      expect(nextPurity).toBe(BirthPurity.F1);
+    });
+  });
+
+  describe('helper methods', () => {
+    it('should not add key when addIfDefined receives null value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfDefined(data, 'testKey', null);
+      expect(data).not.toHaveProperty('testKey');
+    });
+
+    it('should not add key when addIfDefined receives undefined value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfDefined(data, 'testKey', undefined);
+      expect(data).not.toHaveProperty('testKey');
+    });
+
+    it('should add key when addIfDefined receives valid value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfDefined(data, 'testKey', 'testValue');
+      expect(data.testKey).toBe('testValue');
+    });
+
+    it('should add key with null when addIfNotUndefined receives null value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfNotUndefined(data, 'testKey', null);
+      expect(data.testKey).toBeNull();
+    });
+
+    it('should not add key when addIfNotUndefined receives undefined value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfNotUndefined(data, 'testKey', undefined);
+      expect(data).not.toHaveProperty('testKey');
+    });
+
+    it('should add key when addIfNotUndefined receives valid value', () => {
+      const data: Record<string, unknown> = {};
+      (service as any).addIfNotUndefined(data, 'testKey', 'testValue');
+      expect(data.testKey).toBe('testValue');
     });
   });
 });
