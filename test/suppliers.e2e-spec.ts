@@ -1,109 +1,34 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
 
 describe('Suppliers Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let testProperty: any;
-  let authToken: string;
-  let mainUserToken: string;
+  let context: E2ETestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'Suppliers Test Company',
       email: 'suppliers@testcompany.com',
       cnpj: '11.222.333/0001-55',
       planName: 'Avançado',
       isTrial: true,
+      createProperty: true,
     });
-
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    mainUserToken = loginResponse.body.access_token;
 
     // Create a test property
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
+    // Property is already created by setupE2ETest with createProperty: true
 
     // Create a regular user with limited permissions
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    const regularUser = await prisma.user.create({
+    const regularUser = await context.prisma.user.create({
       data: {
         name: 'Regular User',
         email: 'regular@testcompany.com',
         phone: '(47) 88888-8888',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -141,9 +66,8 @@ describe('Suppliers Management Flow (e2e)', () => {
 
     it('should create a supplier successfully (main user)', async () => {
       const dto = { ...createSupplierDto, propertyIds: [testProperty.id] };
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/suppliers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -151,7 +75,7 @@ describe('Suppliers Management Flow (e2e)', () => {
         code: dto.code,
         name: dto.name,
         status: dto.status,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.createdAt).toBeDefined();
@@ -175,9 +99,8 @@ describe('Suppliers Management Flow (e2e)', () => {
         propertyIds: [testProperty.id],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/suppliers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -256,7 +179,7 @@ describe('Suppliers Management Flow (e2e)', () => {
         .expect(201);
 
       // Login as other company user
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherTestData.user.id },
         data: {
           status: 'active',
@@ -321,36 +244,36 @@ describe('Suppliers Management Flow (e2e)', () => {
   describe('GET /suppliers', () => {
     beforeEach(async () => {
       // Create test suppliers
-      await prisma.supplier.create({
+      await context.prisma.supplier.create({
         data: {
           code: '001',
           name: 'Supplier 1',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
         },
       });
 
-      await prisma.supplier.create({
+      await context.prisma.supplier.create({
         data: {
           code: '002',
           name: 'Supplier 2',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
         },
       });
 
-      await prisma.supplier.create({
+      await context.prisma.supplier.create({
         data: {
           code: '003',
           name: 'Deleted Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           deletedAt: new Date(), // Soft deleted
           properties: {
             create: [{ propertyId: testProperty.id }],
@@ -360,9 +283,8 @@ describe('Suppliers Management Flow (e2e)', () => {
     });
 
     it('should return all suppliers for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/suppliers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -373,9 +295,8 @@ describe('Suppliers Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted suppliers', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/suppliers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       const codes = response.body.map((s: any) => s.code);
@@ -384,7 +305,7 @@ describe('Suppliers Management Flow (e2e)', () => {
 
     it('should fail without view permission', async () => {
       // Update regular user to have no view permission
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { email: 'regular@testcompany.com' },
         data: {
           permissions: {
@@ -419,7 +340,7 @@ describe('Suppliers Management Flow (e2e)', () => {
           code: '001',
           name: 'Test Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
@@ -450,7 +371,7 @@ describe('Suppliers Management Flow (e2e)', () => {
 
     it('should return 404 for soft-deleted supplier', async () => {
       // Soft delete the supplier
-      await prisma.supplier.update({
+      await context.prisma.supplier.update({
         where: { id: supplierId },
         data: { deletedAt: new Date() },
       });
@@ -471,7 +392,7 @@ describe('Suppliers Management Flow (e2e)', () => {
           code: '001',
           name: 'Test Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
@@ -509,12 +430,12 @@ describe('Suppliers Management Flow (e2e)', () => {
 
     it('should fail with duplicate code', async () => {
       // Create another supplier
-      await prisma.supplier.create({
+      await context.prisma.supplier.create({
         data: {
           code: '002',
           name: 'Other Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
@@ -539,7 +460,7 @@ describe('Suppliers Management Flow (e2e)', () => {
           code: '001',
           name: 'Test Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },
@@ -607,7 +528,7 @@ describe('Suppliers Management Flow (e2e)', () => {
 
       otherUser = otherTestData.user;
 
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherUser.id },
         data: {
           status: 'active',
@@ -631,7 +552,7 @@ describe('Suppliers Management Flow (e2e)', () => {
           code: '001',
           name: 'First Company Supplier',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           properties: {
             create: [{ propertyId: testProperty.id }],
           },

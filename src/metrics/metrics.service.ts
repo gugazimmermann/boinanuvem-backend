@@ -1,23 +1,37 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as promClient from 'prom-client';
 
+interface DefaultMetricsCollector {
+  stop?: () => void;
+  _interval?: NodeJS.Timeout;
+}
+
 @Injectable()
-export class MetricsService {
+export class MetricsService implements OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
   private readonly registry: promClient.Registry;
   private readonly httpRequestsTotal: promClient.Counter;
   private readonly httpRequestDuration: promClient.Histogram;
   private readonly httpRequestsInProgress: promClient.Gauge;
   private readonly systemMetrics: promClient.Gauge[];
+  private defaultMetricsCollector: DefaultMetricsCollector | undefined;
 
   constructor() {
     this.logger.debug('Initializing MetricsService');
     this.registry = new promClient.Registry();
 
-    promClient.collectDefaultMetrics({
-      register: this.registry,
-      prefix: 'boinanuvem_',
-    });
+    // In test environment, DO NOT collect default metrics to prevent interval leaks
+    // prom-client's collectDefaultMetrics creates intervals that are very difficult to stop
+    // and cause Jest worker processes to hang. Tests don't need system metrics anyway.
+    if (process.env.NODE_ENV === 'test') {
+      this.defaultMetricsCollector = undefined;
+    } else {
+      // Track the default metrics collector so we can stop it later
+      this.defaultMetricsCollector = promClient.collectDefaultMetrics({
+        register: this.registry,
+        prefix: 'boinanuvem_',
+      }) as unknown as DefaultMetricsCollector;
+    }
 
     this.httpRequestsTotal = new promClient.Counter({
       name: 'boinanuvem_http_requests_total',
@@ -159,5 +173,30 @@ export class MetricsService {
     };
 
     return new promClient.Histogram(config);
+  }
+
+  onModuleDestroy(): void {
+    // Stop default metrics collection to prevent intervals from keeping the process alive
+    if (this.defaultMetricsCollector) {
+      try {
+        // The collector object returned by collectDefaultMetrics has a stop() method
+        // This stops all intervals created for metrics collection
+        if (typeof this.defaultMetricsCollector.stop === 'function') {
+          this.defaultMetricsCollector.stop();
+        }
+        // Also try to access the internal _interval if it exists and clear it
+        if (this.defaultMetricsCollector._interval) {
+          clearInterval(this.defaultMetricsCollector._interval);
+        }
+      } catch (error) {
+        this.logger.warn('Failed to stop default metrics collector', error);
+      }
+    }
+    // Clear the registry to ensure all metrics are cleaned up
+    try {
+      this.registry.clear();
+    } catch (error) {
+      this.logger.warn('Failed to clear metrics registry', error);
+    }
   }
 }

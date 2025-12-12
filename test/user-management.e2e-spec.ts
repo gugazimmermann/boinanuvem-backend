@@ -1,100 +1,38 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  teardownE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
 
 describe('User Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let authToken: string;
+  let context: E2ETestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    // Add validation pipe for E2E tests
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'User Management Test Company',
       email: 'usermgmt@testcompany.com',
       cnpj: '11.222.333/0001-44',
       planName: 'Avançado',
       isTrial: true,
     });
-
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    authToken = loginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('User Profile Management', () => {
     it('should get current user profile', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/users/me')
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: testUser.id,
-        email: testUser.email,
-        name: testUser.name,
-        companyId: testCompany.id,
+        id: context.testUser.id,
+        email: context.testUser.email,
+        name: context.testUser.name,
+        companyId: context.testCompany.id,
         mainUser: true,
         status: 'active',
       });
@@ -106,21 +44,20 @@ describe('User Management Flow (e2e)', () => {
         phone: '(11) 98765-4321',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .put('/users/me')
-        .set('Authorization', `Bearer ${authToken}`)
         .send(updateData)
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: testUser.id,
+        id: context.testUser.id,
         name: updateData.name,
         phone: updateData.phone,
       });
 
       // Verify in database
-      const updatedUser = await prisma.user.findUnique({
-        where: { id: testUser.id },
+      const updatedUser = await context.prisma.user.findUnique({
+        where: { id: context.testUser.id },
       });
       expect(updatedUser.name).toBe(updateData.name);
       expect(updatedUser.phone).toBe(updateData.phone);
@@ -128,22 +65,21 @@ describe('User Management Flow (e2e)', () => {
 
     it('should handle email conflict during profile update', async () => {
       // Create another user with existing email
-      await prisma.user.create({
+      await context.prisma.user.create({
         data: {
           email: 'existing@test.com',
           name: 'Existing User',
           phone: '(11) 99999-9999',
           cpf: '999.888.777-66',
           password: 'hashedpassword',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
         },
       });
 
-      await request(app.getHttpServer())
+      await authenticatedRequest(context.app, context.mainUserToken)
         .put('/users/me')
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'existing@test.com' })
         .expect(409);
     });
@@ -159,9 +95,8 @@ describe('User Management Flow (e2e)', () => {
         password: 'password123',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/users')
-        .set('Authorization', `Bearer ${authToken}`)
         .send(teamMemberData)
         .expect(201);
 
@@ -173,7 +108,7 @@ describe('User Management Flow (e2e)', () => {
       });
 
       // Verify the user was created in the database with all fields
-      const createdTeamMember = await prisma.user.findUnique({
+      const createdTeamMember = await context.prisma.user.findUnique({
         where: { email: teamMemberData.email },
       });
       expect(createdTeamMember).toMatchObject({
@@ -181,13 +116,13 @@ describe('User Management Flow (e2e)', () => {
         name: teamMemberData.name,
         phone: teamMemberData.phone,
         cpf: teamMemberData.cpf,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'pending',
       });
 
       // Verify in database
-      const createdUser = await prisma.user.findUnique({
+      const createdUser = await context.prisma.user.findUnique({
         where: { email: teamMemberData.email },
       });
       expect(createdUser).toBeTruthy();
@@ -196,14 +131,14 @@ describe('User Management Flow (e2e)', () => {
 
     it('should get team members list', async () => {
       // Create a team member first
-      const teamMember = await prisma.user.create({
+      const teamMember = await context.prisma.user.create({
         data: {
           email: 'team1@test.com',
           name: 'Team Member 1',
           phone: '(11) 77777-7777',
           cpf: '987.654.321-00',
           password: 'hashedpassword',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
           permissions: {
@@ -214,9 +149,8 @@ describe('User Management Flow (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/users')
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       expect(response.body).toHaveLength(2); // Main user + team member
@@ -233,14 +167,14 @@ describe('User Management Flow (e2e)', () => {
 
     it('should update team member', async () => {
       // Create a team member first
-      const teamMember = await prisma.user.create({
+      const teamMember = await context.prisma.user.create({
         data: {
           email: 'team2@test.com',
           name: 'Team Member 2',
           phone: '(11) 66666-6666',
           cpf: '111.222.333-44',
           password: 'hashedpassword',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
         },
@@ -251,9 +185,8 @@ describe('User Management Flow (e2e)', () => {
         phone: '(11) 55555-5555',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .put(`/users/${teamMember.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(updateData)
         .expect(200);
 
@@ -266,14 +199,14 @@ describe('User Management Flow (e2e)', () => {
 
     it('should update team member permissions', async () => {
       // Create a team member first
-      const teamMember = await prisma.user.create({
+      const teamMember = await context.prisma.user.create({
         data: {
           email: 'team3@test.com',
           name: 'Team Member 3',
           phone: '(11) 44444-4444',
           cpf: '555.666.777-88',
           password: 'hashedpassword',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
           permissions: null,
@@ -367,14 +300,14 @@ describe('User Management Flow (e2e)', () => {
 
     it('should deactivate team member', async () => {
       // Create a team member first
-      const teamMember = await prisma.user.create({
+      const teamMember = await context.prisma.user.create({
         data: {
           email: 'team4@test.com',
           name: 'Team Member 4',
           phone: '(11) 33333-3333',
           cpf: '999.888.777-66',
           password: 'hashedpassword',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
         },
@@ -388,7 +321,7 @@ describe('User Management Flow (e2e)', () => {
       expect(response.body.message).toBe('User deactivated successfully');
 
       // Verify in database
-      const deactivatedUser = await prisma.user.findUnique({
+      const deactivatedUser = await context.prisma.user.findUnique({
         where: { id: teamMember.id },
       });
       expect(deactivatedUser.status).toBe('inactive');
@@ -396,14 +329,14 @@ describe('User Management Flow (e2e)', () => {
 
     it('should prevent team member from creating other team members', async () => {
       // Create a team member
-      const teamMember = await prisma.user.create({
+      const teamMember = await context.prisma.user.create({
         data: {
           email: 'team5@test.com',
           name: 'Team Member 5',
           phone: '(11) 22222-2222',
           cpf: '111.111.111-11',
           password: await require('bcrypt').hash('password123', 10),
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
         },
@@ -460,7 +393,7 @@ describe('User Management Flow (e2e)', () => {
         isTrial: false,
       });
 
-      const otherUser = await prisma.user.create({
+      const otherUser = await context.prisma.user.create({
         data: {
           email: 'otheruser@test.com',
           name: 'Other User',
@@ -474,9 +407,8 @@ describe('User Management Flow (e2e)', () => {
       });
 
       // Try to update other company's user (should fail)
-      await request(app.getHttpServer())
+      await authenticatedRequest(context.app, context.mainUserToken)
         .put(`/users/${otherUser.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ name: 'Hacked Name' })
         .expect(403);
     });

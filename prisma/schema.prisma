@@ -16,7 +16,7 @@ model Plan {
   description  String
   monthlyPrice String
   annualPrice  String
-  limits       Json     // Store limits as JSON: {properties, locations, animals, members}
+  limits       Json // Store limits as JSON: {properties, locations, animals, members}
   features     String[] // Array of feature strings
   popular      Boolean  @default(false)
   status       String   @default("active") // "active" or "inactive"
@@ -30,72 +30,83 @@ model Plan {
 }
 
 model Company {
-  id           String   @id @default(cuid())
-  cnpj         String   @unique
-  companyName  String
-  email        String   @unique
-  phone        String
-  street       String
-  number       String
-  complement   String?
-  neighborhood String
-  city         String
-  state        String
-  zipCode      String
-  latitude     Float?
-  longitude    Float?
-  status       String   @default("active") // "active" or "inactive"
+  id             String    @id @default(cuid())
+  cnpj           String    @unique
+  companyName    String
+  email          String    @unique
+  phone          String
+  street         String
+  number         String
+  complement     String?
+  neighborhood   String
+  city           String
+  state          String
+  zipCode        String
+  latitude       Float?
+  longitude      Float?
+  status         String    @default("active") // "active" or "inactive"
   trialStartDate DateTime? // When trial period started
   trialEndDate   DateTime? // When trial period ends
   trialStatus    String?   @default("active") // "active", "expired", "converted"
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
-  users         User[]
-  subscriptions CompanySubscription[]
-  payments      CompanyPayment[]
-  properties    Property[]
-  locations     Location[]
-  employees     Employee[]
-  serviceProviders ServiceProvider[]
-  suppliers     Supplier[]
-  buyers        Buyer[]
-  animals       Animal[]
-  births        Birth[]
-  acquisitions  Acquisition[]
+  users              User[]
+  subscriptions      CompanySubscription[]
+  payments           CompanyPayment[]
+  properties         Property[]
+  locations          Location[]
+  employees          Employee[]
+  serviceProviders   ServiceProvider[]
+  suppliers          Supplier[]
+  buyers             Buyer[]
+  animals            Animal[]
+  births             Birth[]
+  acquisitions       Acquisition[]
+  sales              Sale[]
+  deaths             Death[]
+  weighings          Weighing[]
+  inventoryItems     InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  breedings          Breeding[]
+  sanitaryControls   SanitaryControl[]
+  cashFlows          CashFlow[]
+  accountsPayable    AccountsPayable[]
+  accountsReceivable AccountsReceivable[]
+  bankAccounts       BankAccount[]
 
   @@map("companies")
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  cpf          String?
-  email        String   @unique
-  phone        String
-  password     String
-  street       String?
-  number       String?
-  complement   String?
-  neighborhood String?
-  city         String?
-  state        String?
-  zipCode      String?
-  mainUser     Boolean  @default(false)
-  status       String   @default("pending") // "pending", "active", "inactive"
-  permissions  Json?    // Store permissions as JSON
-  lastAccess   DateTime?
+  id              String    @id @default(cuid())
+  name            String
+  cpf             String?
+  email           String    @unique
+  phone           String
+  password        String
+  street          String?
+  number          String?
+  complement      String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  zipCode         String?
+  mainUser        Boolean   @default(false)
+  status          String    @default("pending") // "pending", "active", "inactive"
+  permissions     Json? // Store permissions as JSON
+  lastAccess      DateTime?
   emailVerifiedAt DateTime?
-  companyId    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  companyId       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Relations
-  company           Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  refreshTokens     RefreshToken[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  refreshTokens      RefreshToken[]
   emailVerifications EmailVerification[]
-  passwordResets    PasswordReset[]
+  passwordResets     PasswordReset[]
 
   @@map("users")
 }
@@ -110,94 +121,94 @@ model RefreshToken {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
 
 model EmailVerification {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
   email     String
   userId    String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("email_verifications")
 }
 
 model PasswordReset {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
   email     String
   userId    String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_resets")
 }
 
 model CompanySubscription {
-  id          String   @id @default(cuid())
-  companyId   String
-  planId      String
-  status      String   @default("active") // "active", "cancelled", "expired", "trial"
-  startDate   DateTime @default(now())
-  endDate     DateTime?
-  billingCycle String  @default("monthly") // "monthly", "annual"
-  isActive    Boolean  @default(true)
-  isTrial     Boolean  @default(false)
+  id           String    @id @default(cuid())
+  companyId    String
+  planId       String
+  status       String    @default("active") // "active", "cancelled", "expired", "trial"
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  billingCycle String    @default("monthly") // "monthly", "annual"
+  isActive     Boolean   @default(true)
+  isTrial      Boolean   @default(false)
   trialEndDate DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan        Plan     @relation(fields: [planId], references: [id])
-  payments    CompanyPayment[]
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan     Plan             @relation(fields: [planId], references: [id])
+  payments CompanyPayment[]
 
   @@map("company_subscriptions")
 }
 
 model CompanyPayment {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   companyId      String
   subscriptionId String?
-  amount         Decimal  @db.Decimal(10, 2)
-  currency       String   @default("BRL")
-  status         String   @default("pending") // "pending", "paid", "failed", "refunded", "cancelled"
-  paymentMethod  String?  // "credit_card", "pix", "bank_transfer", "boleto"
+  amount         Decimal   @db.Decimal(10, 2)
+  currency       String    @default("BRL")
+  status         String    @default("pending") // "pending", "paid", "failed", "refunded", "cancelled"
+  paymentMethod  String? // "credit_card", "pix", "bank_transfer", "boleto"
   paymentDate    DateTime?
   dueDate        DateTime
   description    String?
-  externalId     String?  // External payment gateway ID
-  metadata       Json?    // Additional payment metadata
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  externalId     String? // External payment gateway ID
+  metadata       Json? // Additional payment metadata
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
-  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  subscription   CompanySubscription? @relation(fields: [subscriptionId], references: [id])
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscription CompanySubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("company_payments")
 }
 
 model Property {
-  id                            String   @id @default(cuid())
+  id                            String    @id @default(cuid())
   code                          String
   name                          String
-  area                          Json     // Store area as JSON: { value: number, type: string }
-  status                        String   @default("active") // "active" or "inactive"
+  area                          Json // Store area as JSON: { value: number, type: string }
+  status                        String    @default("active") // "active" or "inactive"
   companyId                     String
   street                        String
   number                        String
@@ -208,23 +219,29 @@ model Property {
   zipCode                       String
   latitude                      Float?
   longitude                     Float?
-  pasturePlanning               Json?    // Store pasture planning as JSON array
-  breedingMonths                Json?    // Store breeding months as JSON array
-  pasturePlanningModifiedByUser Boolean  @default(false)
-  breedingSeasonModifiedByUser  Boolean  @default(false)
+  pasturePlanning               Json? // Store pasture planning as JSON array
+  breedingMonths                Json? // Store breeding months as JSON array
+  pasturePlanningModifiedByUser Boolean   @default(false)
+  breedingSeasonModifiedByUser  Boolean   @default(false)
   deletedAt                     DateTime? // Soft delete timestamp
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
 
   // Relations
-  company                       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  locations                     Location[]
-  employeeProperties            EmployeeProperty[]
-  serviceProviderProperties     ServiceProviderProperty[]
-  supplierProperties            SupplierProperty[]
-  buyerProperties               BuyerProperty[]
-  animals                       Animal[]
-  acquisitions                  Acquisition[]
+  company                   Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  locations                 Location[]
+  employeeProperties        EmployeeProperty[]
+  serviceProviderProperties ServiceProviderProperty[]
+  supplierProperties        SupplierProperty[]
+  buyerProperties           BuyerProperty[]
+  animals                   Animal[]
+  acquisitions              Acquisition[]
+  sales                     Sale[]
+  inventoryItemProperties   InventoryItemProperty[]
+  inventoryMovements        InventoryMovement[]
+  cashFlows                 CashFlow[]
+  accountsPayable           AccountsPayable[]
+  accountsReceivable        AccountsReceivable[]
 
   @@unique([companyId, code], name: "unique_property_code_per_company")
   @@index([companyId])
@@ -233,21 +250,22 @@ model Property {
 }
 
 model Location {
-  id            String   @id @default(cuid())
-  code          String
-  name          String
-  locationType  String   // pasture, barn, storage, corral, silo, field, paddock, feedlot, semi_feedlot, milking_parlor, warehouse, garage, office, residence, other
-  area          Json     // Store area as JSON: { value: number, type: string }
-  status        String   @default("active") // "active" or "inactive"
-  companyId     String
-  propertyId    String
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  code         String
+  name         String
+  locationType String // pasture, barn, storage, corral, silo, field, paddock, feedlot, semi_feedlot, milking_parlor, warehouse, garage, office, residence, other
+  area         Json // Store area as JSON: { value: number, type: string }
+  status       String    @default("active") // "active" or "inactive"
+  companyId    String
+  propertyId   String
+  deletedAt    DateTime? // Soft delete timestamp
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  inventoryMovements InventoryMovement[]
 
   @@unique([companyId, propertyId, code], name: "unique_location_code_per_company_property")
   @@index([companyId])
@@ -257,28 +275,30 @@ model Location {
 }
 
 model Employee {
-  id            String   @id @default(cuid())
-  code          String
-  name          String
-  cpf           String?
-  email         String?
-  phone         String?
-  status        String   @default("active") // "active" or "inactive"
-  companyId     String
-  street        String?
-  number        String?
-  complement    String?
-  neighborhood  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  code         String
+  name         String
+  cpf          String?
+  email        String?
+  phone        String?
+  status       String    @default("active") // "active" or "inactive"
+  companyId    String
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  deletedAt    DateTime? // Soft delete timestamp
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  properties    EmployeeProperty[]
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties      EmployeeProperty[]
+  cashFlows       CashFlow[]
+  accountsPayable AccountsPayable[]
 
   @@unique([companyId, code], name: "unique_employee_code_per_company")
   @@index([companyId])
@@ -293,8 +313,8 @@ model EmployeeProperty {
   createdAt  DateTime @default(now())
 
   // Relations
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, propertyId], name: "unique_employee_property")
   @@index([employeeId])
@@ -303,29 +323,31 @@ model EmployeeProperty {
 }
 
 model ServiceProvider {
-  id            String   @id @default(cuid())
-  code          String
-  name          String
-  cpf           String?
-  cnpj          String?
-  email         String?
-  phone         String?
-  status        String   @default("active") // "active" or "inactive"
-  companyId     String
-  street        String?
-  number        String?
-  complement    String?
-  neighborhood  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  code         String
+  name         String
+  cpf          String?
+  cnpj         String?
+  email        String?
+  phone        String?
+  status       String    @default("active") // "active" or "inactive"
+  companyId    String
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  deletedAt    DateTime? // Soft delete timestamp
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  properties    ServiceProviderProperty[]
+  company         Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties      ServiceProviderProperty[]
+  cashFlows       CashFlow[]
+  accountsPayable AccountsPayable[]
 
   @@unique([companyId, code], name: "unique_service_provider_code_per_company")
   @@index([companyId])
@@ -334,14 +356,14 @@ model ServiceProvider {
 }
 
 model ServiceProviderProperty {
-  id              String   @id @default(cuid())
+  id                String   @id @default(cuid())
   serviceProviderId String
-  propertyId      String
-  createdAt       DateTime @default(now())
+  propertyId        String
+  createdAt         DateTime @default(now())
 
   // Relations
   serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
-  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property        Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([serviceProviderId, propertyId], name: "unique_service_provider_property")
   @@index([serviceProviderId])
@@ -350,30 +372,34 @@ model ServiceProviderProperty {
 }
 
 model Supplier {
-  id            String   @id @default(cuid())
-  code          String
-  name          String
-  cpf           String?
-  cnpj          String?
-  email         String?
-  phone         String?
-  status        String   @default("active") // "active" or "inactive"
-  companyId     String
-  street        String?
-  number        String?
-  complement    String?
-  neighborhood  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  code         String
+  name         String
+  cpf          String?
+  cnpj         String?
+  email        String?
+  phone        String?
+  status       String    @default("active") // "active" or "inactive"
+  companyId    String
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  deletedAt    DateTime? // Soft delete timestamp
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  properties    SupplierProperty[]
-  acquisitions  Acquisition[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties         SupplierProperty[]
+  acquisitions       Acquisition[]
+  inventoryItems     InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  cashFlows          CashFlow[]
+  accountsPayable    AccountsPayable[]
 
   @@unique([companyId, code], name: "unique_supplier_code_per_company")
   @@index([companyId])
@@ -388,8 +414,8 @@ model SupplierProperty {
   createdAt  DateTime @default(now())
 
   // Relations
-  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([supplierId, propertyId], name: "unique_supplier_property")
   @@index([supplierId])
@@ -398,29 +424,32 @@ model SupplierProperty {
 }
 
 model Buyer {
-  id            String   @id @default(cuid())
-  code          String
-  name          String
-  cpf           String?
-  cnpj          String?
-  email         String?
-  phone         String?
-  status        String   @default("active") // "active" or "inactive"
-  companyId     String
-  street        String?
-  number        String?
-  complement    String?
-  neighborhood  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  code         String
+  name         String
+  cpf          String?
+  cnpj         String?
+  email        String?
+  phone        String?
+  status       String    @default("active") // "active" or "inactive"
+  companyId    String
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  deletedAt    DateTime? // Soft delete timestamp
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  properties    BuyerProperty[]
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  properties         BuyerProperty[]
+  sales              Sale[]
+  cashFlows          CashFlow[]
+  accountsReceivable AccountsReceivable[]
 
   @@unique([companyId, code], name: "unique_buyer_code_per_company")
   @@index([companyId])
@@ -435,8 +464,8 @@ model BuyerProperty {
   createdAt  DateTime @default(now())
 
   // Relations
-  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  buyer    Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([buyerId, propertyId], name: "unique_buyer_property")
   @@index([buyerId])
@@ -445,25 +474,25 @@ model BuyerProperty {
 }
 
 model Birth {
-  id            String    @id @default(cuid())
-  animalId      String    @unique
-  birthDate     DateTime
-  breed         String?
-  gender        String?   // "male" | "female"
-  motherId      String?
-  fatherId      String?
-  purity        String?   // "po", "pc", "f1", "f2", "f3", "f4", "f5"
-  observation   String?
-  companyId     String
-  deletedAt     DateTime? // Soft delete timestamp
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  animalId    String    @unique
+  birthDate   DateTime
+  breed       String?
+  gender      String? // "male" | "female"
+  motherId    String?
+  fatherId    String?
+  purity      String? // "po", "pc", "f1", "f2", "f3", "f4", "f5"
+  observation String?
+  companyId   String
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  animal        Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
-  mother        Animal?   @relation("MotherBirths", fields: [motherId], references: [id], onDelete: SetNull)
-  father        Animal?   @relation("FatherBirths", fields: [fatherId], references: [id], onDelete: SetNull)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal  Animal  @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  mother  Animal? @relation("MotherBirths", fields: [motherId], references: [id], onDelete: SetNull)
+  father  Animal? @relation("FatherBirths", fields: [fatherId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([animalId])
@@ -474,29 +503,31 @@ model Birth {
 }
 
 model Acquisition {
-  id                    String    @id @default(cuid())
-  companyId             String
-  propertyId            String
-  supplierId            String
-  acquisitionDate       DateTime
-  pricingMode           String    // "individual" | "total"
-  paymentMethod         String    // "cash_flow" | "accounts_payable"
-  totalPrice            Decimal   @db.Decimal(10, 2)
-  transportationFee     Decimal?  @db.Decimal(10, 2)
-  handlingFee           Decimal?  @db.Decimal(10, 2)
-  fees                  Json?     // Store fees as JSON: [{id: string, name: string, amount: number}]
-  linkedCashFlowId      String?
+  id                      String    @id @default(cuid())
+  companyId               String
+  propertyId              String
+  supplierId              String
+  acquisitionDate         DateTime
+  pricingMode             String // "individual" | "total"
+  paymentMethod           String // "cash_flow" | "accounts_payable"
+  totalPrice              Decimal   @db.Decimal(10, 2)
+  transportationFee       Decimal?  @db.Decimal(10, 2)
+  handlingFee             Decimal?  @db.Decimal(10, 2)
+  fees                    Json? // Store fees as JSON: [{id: string, name: string, amount: number}]
+  linkedCashFlowId        String?
   linkedAccountsPayableId String?
-  observation           String?
-  deletedAt             DateTime? // Soft delete timestamp
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  observation             String?
+  deletedAt               DateTime? // Soft delete timestamp
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Relations
-  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  property              Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  supplier              Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  acquisitionItems      AcquisitionItem[]
+  company                Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property               Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  supplier               Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  acquisitionItems       AcquisitionItem[]
+  linkedCashFlows        CashFlow[]
+  linkedAccountsPayables AccountsPayable[]
 
   @@index([companyId])
   @@index([propertyId])
@@ -506,26 +537,26 @@ model Acquisition {
 }
 
 model AcquisitionItem {
-  id                      String      @id @default(cuid())
-  acquisitionId           String
-  animalId                String      @unique
-  price                   Decimal     @db.Decimal(10, 2)
-  weight                  Decimal     @db.Decimal(10, 2)
-  costPerArroba           Decimal     @db.Decimal(10, 2)
-  breed                   String?
-  gender                  String?     // "male" | "female"
-  birthDate               DateTime?
-  motherId                String?
-  fatherId                String?
+  id                       String    @id @default(cuid())
+  acquisitionId            String
+  animalId                 String    @unique
+  price                    Decimal   @db.Decimal(10, 2)
+  weight                   Decimal   @db.Decimal(10, 2)
+  costPerArroba            Decimal   @db.Decimal(10, 2)
+  breed                    String?
+  gender                   String? // "male" | "female"
+  birthDate                DateTime?
+  motherId                 String?
+  fatherId                 String?
   motherRegistrationNumber String?
   fatherRegistrationNumber String?
-  purity                  String?     // "po", "pc", "f1", "f2", "f3", "f4", "f5"
-  birthObservation        String?
-  createdAt               DateTime    @default(now())
+  purity                   String? // "po", "pc", "f1", "f2", "f3", "f4", "f5"
+  birthObservation         String?
+  createdAt                DateTime  @default(now())
 
   // Relations
-  acquisition             Acquisition @relation(fields: [acquisitionId], references: [id], onDelete: Cascade)
-  animal                  Animal      @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  acquisition Acquisition @relation(fields: [acquisitionId], references: [id], onDelete: Cascade)
+  animal      Animal      @relation(fields: [animalId], references: [id], onDelete: Cascade)
 
   @@index([acquisitionId])
   @@index([animalId])
@@ -533,28 +564,410 @@ model AcquisitionItem {
 }
 
 model Animal {
-  id               String    @id @default(cuid())
-  code             String
+  id                 String    @id @default(cuid())
+  code               String
   registrationNumber String
-  acquisitionDate  DateTime?
-  status           String    @default("active") // "active", "inactive", "sold"
-  companyId        String
-  propertyId       String
-  deletedAt        DateTime? // Soft delete timestamp
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  acquisitionDate    DateTime?
+  status             String    @default("active") // "active", "inactive", "sold"
+  companyId          String
+  propertyId         String
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // Relations
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   birth            Birth?
-  birthsAsMother   Birth[]   @relation("MotherBirths")
-  birthsAsFather   Birth[]   @relation("FatherBirths")
+  birthsAsMother   Birth[]           @relation("MotherBirths")
+  birthsAsFather   Birth[]           @relation("FatherBirths")
   acquisitionItem  AcquisitionItem?
+  saleItems        SaleItem[]
+  death            Death?
+  weighings        Weighing[]
+  breedings        Breeding[]
+  breedingsAsBull  Breeding[]        @relation("BreedingBull")
+  sanitaryControls SanitaryControl[]
 
   @@unique([companyId, code], name: "unique_animal_code_per_company")
   @@index([companyId])
   @@index([propertyId])
   @@index([deletedAt])
   @@map("animals")
+}
+
+model Sale {
+  id                         String    @id @default(cuid())
+  companyId                  String
+  propertyId                 String
+  buyerId                    String
+  saleDate                   DateTime
+  saleType                   String // "slaughterhouse" | "other_farm" | "auction"
+  pricingMode                String // "individual" | "total"
+  paymentMethod              String // "cash_flow" | "accounts_receivable"
+  totalPrice                 Decimal   @db.Decimal(10, 2)
+  fees                       Json? // Store fees as JSON: [{id: string, name: string, amount: number}]
+  transportationFee          Decimal?  @db.Decimal(10, 2)
+  additionalFees             Decimal?  @db.Decimal(10, 2)
+  linkedCashFlowId           String?
+  linkedAccountsReceivableId String?
+  observation                String?
+  deletedAt                  DateTime? // Soft delete timestamp
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  // Relations
+  company                   Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property                  Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  buyer                     Buyer                @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  saleItems                 SaleItem[]
+  linkedCashFlows           CashFlow[]
+  linkedAccountsReceivables AccountsReceivable[]
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([buyerId])
+  @@index([deletedAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id            String   @id @default(cuid())
+  saleId        String
+  animalId      String
+  price         Decimal  @db.Decimal(10, 2)
+  weight        Decimal  @db.Decimal(10, 2)
+  carcassWeight Decimal? @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([animalId])
+  @@map("sale_items")
+}
+
+model Death {
+  id          String    @id @default(cuid())
+  animalId    String    @unique
+  deathDate   DateTime
+  cause       String
+  observation String?
+  companyId   String
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal  Animal  @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([deletedAt])
+  @@map("deaths")
+}
+
+model Weighing {
+  id                 String    @id @default(cuid())
+  animalId           String
+  weighingDate       DateTime
+  weight             Decimal   @db.Decimal(10, 2)
+  employeeIds        Json // Store as JSON array: string[]
+  serviceProviderIds Json // Store as JSON array: string[]
+  appliedMedicines   Json? // Store as JSON: [{itemId: string, quantity: number, calculatedDosage: number}]
+  observation        String?
+  companyId          String
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal  Animal  @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([deletedAt])
+  @@map("weighings")
+}
+
+model InventoryItem {
+  id             String    @id @default(cuid())
+  code           String
+  name           String
+  description    String?
+  category       String // "tools", "feed", "supplements", "vitamins", "medicines", "vaccines", "fertilizer", "custom"
+  customCategory String?
+  unit           String
+  minimumStock   Decimal   @db.Decimal(10, 2)
+  unitPrice      Decimal?  @db.Decimal(10, 2)
+  supplierId     String?
+  hasExpiration  Boolean   @default(false)
+  expirationDate DateTime?
+  usageAmount    Decimal?  @db.Decimal(10, 2)
+  usageUnit      String?
+  usageBasis     String? // "per_animal", "per_kg", etc.
+  companyId      String
+  deletedAt      DateTime? // Soft delete timestamp
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  company          Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier         Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  properties       InventoryItemProperty[]
+  movements        InventoryMovement[]
+  sanitaryControls SanitaryControl[]       @relation("SanitaryControlInventoryItem")
+
+  @@unique([companyId, code], name: "unique_inventory_item_code_per_company")
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([deletedAt])
+  @@map("inventory_items")
+}
+
+model InventoryItemProperty {
+  id              String   @id @default(cuid())
+  inventoryItemId String
+  propertyId      String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryItemId, propertyId], name: "unique_inventory_item_property")
+  @@index([inventoryItemId])
+  @@index([propertyId])
+  @@map("inventory_item_properties")
+}
+
+model InventoryMovement {
+  id                 String    @id @default(cuid())
+  itemId             String
+  type               String // "purchase", "sale", "adjustment", "consumption", "transfer"
+  quantity           Decimal   @db.Decimal(10, 2)
+  unitPrice          Decimal?  @db.Decimal(10, 2)
+  date               DateTime
+  description        String?
+  supplierId         String?
+  cashFlowId         String?
+  propertyId         String
+  companyId          String
+  locationId         String?
+  expirationDate     DateTime?
+  employeeIds        Json? // Store as JSON array: string[]
+  serviceProviderIds Json? // Store as JSON array: string[]
+  observation        String?
+  fileIds            Json? // Store as JSON array: string[]
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  inventoryItem InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([itemId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("inventory_movements")
+}
+
+model Breeding {
+  id                 String    @id @default(cuid())
+  animalId           String
+  date               DateTime
+  method             String // "natural" | "artificial_insemination"
+  bullId             String?
+  attemptNumber      Int?
+  semenCode          String?
+  confirmed          Boolean   @default(false)
+  observation        String?
+  companyId          String
+  employeeIds        Json? // Store as JSON array: string[]
+  serviceProviderIds Json? // Store as JSON array: string[]
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal  Animal  @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  bull    Animal? @relation("BreedingBull", fields: [bullId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([bullId])
+  @@index([deletedAt])
+  @@map("breedings")
+}
+
+model SanitaryControl {
+  id                 String    @id @default(cuid())
+  animalId           String
+  date               DateTime
+  itemId             String? // Inventory item ID (medicine, vaccine, etc.)
+  quantity           Decimal?  @db.Decimal(10, 2)
+  calculatedDosage   Decimal?  @db.Decimal(10, 2)
+  observation        String?
+  companyId          String
+  employeeIds        Json? // Store as JSON array: string[]
+  serviceProviderIds Json? // Store as JSON array: string[]
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal        Animal         @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem? @relation("SanitaryControlInventoryItem", fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([itemId])
+  @@index([deletedAt])
+  @@map("sanitary_controls")
+}
+
+model CashFlow {
+  id                  String    @id @default(cuid())
+  companyId           String
+  type                String // "income" | "expense"
+  amount              Decimal   @db.Decimal(10, 2)
+  date                DateTime
+  description         String?
+  category            String? // CashFlowCategory enum values
+  paymentMethod       String? // PaymentMethod enum values
+  status              String    @default("completed") // "completed" | "pending" | "cancelled"
+  bankAccountId       String?
+  propertyId          String?
+  employeeId          String?
+  serviceProviderId   String?
+  supplierId          String?
+  buyerId             String?
+  paymentDate         DateTime?
+  referenceNumber     String?
+  linkedSaleId        String?
+  linkedAcquisitionId String?
+  observation         String?
+  deletedAt           DateTime? // Soft delete timestamp
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  employee        Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  serviceProvider ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  buyer           Buyer?           @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  sale            Sale?            @relation(fields: [linkedSaleId], references: [id], onDelete: SetNull)
+  acquisition     Acquisition?     @relation(fields: [linkedAcquisitionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("cash_flows")
+}
+
+model AccountsPayable {
+  id                  String    @id @default(cuid())
+  companyId           String
+  supplierId          String?
+  amount              Decimal   @db.Decimal(10, 2)
+  dueDate             DateTime
+  description         String?
+  category            String?
+  paymentMethod       String?
+  status              String    @default("unpaid") // "unpaid" | "paid" | "overdue" | "partial" | "cancelled"
+  bankAccountId       String?
+  propertyId          String?
+  employeeId          String?
+  serviceProviderId   String?
+  paidDate            DateTime?
+  paidAmount          Decimal?  @db.Decimal(10, 2)
+  referenceNumber     String?
+  linkedAcquisitionId String?
+  observation         String?
+  deletedAt           DateTime? // Soft delete timestamp
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  employee        Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  serviceProvider ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+  acquisition     Acquisition?     @relation(fields: [linkedAcquisitionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("accounts_payable")
+}
+
+model AccountsReceivable {
+  id              String    @id @default(cuid())
+  companyId       String
+  buyerId         String?
+  amount          Decimal   @db.Decimal(10, 2)
+  dueDate         DateTime
+  description     String?
+  category        String?
+  paymentMethod   String?
+  status          String    @default("unpaid") // "unpaid" | "paid" | "overdue" | "partial" | "cancelled"
+  bankAccountId   String?
+  propertyId      String?
+  paidDate        DateTime?
+  paidAmount      Decimal?  @db.Decimal(10, 2)
+  referenceNumber String?
+  linkedSaleId    String?
+  observation     String?
+  deletedAt       DateTime? // Soft delete timestamp
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  buyer    Buyer?    @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  sale     Sale?     @relation(fields: [linkedSaleId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([buyerId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("accounts_receivable")
+}
+
+model BankAccount {
+  id                String    @id @default(cuid())
+  companyId         String
+  bankName          String
+  bankCode          String
+  branch            String
+  accountNumber     String
+  accountType       String // "checking" | "savings" | "investment"
+  accountHolderName String?
+  status            String    @default("active") // "active" | "inactive"
+  deletedAt         DateTime? // Soft delete timestamp
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("bank_accounts")
 }

@@ -1,210 +1,87 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { AcquisitionsService } from './acquisitions.service';
-import { PrismaService } from '../common/services/prisma.service';
 import { CreateAcquisitionDto, UpdateAcquisitionDto, PricingMode } from './dto';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  createServiceTestingModule,
+  getServiceFromModule,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('AcquisitionsService Integration Tests', () => {
   let service: AcquisitionsService;
-  let prisma: PrismaClient;
-  let testCompany: any;
-  let testProperty: any;
-  let testSupplier: any;
-  let testUser: any;
+  let context: IntegrationTestContext;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-07',
+      companyName: 'Test Acquisitions Company',
+      email: 'acquisitions@testcompany.com',
+      userEmail: 'user-acquisitions@testcompany.com',
+      createProperty: true,
+      createSupplier: true,
     });
+  });
 
-    // Ensure database connection
-    await prisma.$connect();
-
-    // Create test company and property
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Acquisitions Company',
-        email: 'acquisitions@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
-
-    testSupplier = await prisma.supplier.create({
-      data: {
-        code: '001',
-        name: 'Test Supplier',
-        companyId: testCompany.id,
-        properties: {
-          create: {
-            propertyId: testProperty.id,
-          },
-        },
-      },
-    });
-
-    const hashedPassword = await require('bcrypt').hash('password123', 10);
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'user-acquisitions@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['acquisitionItem', 'acquisition', 'animal', 'supplier'],
     });
   });
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AcquisitionsService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-        Logger,
-      ],
-    }).compile();
-
-    service = module.get<AcquisitionsService>(AcquisitionsService);
+    const module = await createServiceTestingModule(
+      AcquisitionsService,
+      context.prisma,
+    );
+    service = getServiceFromModule(module, AcquisitionsService);
 
     // Clean up existing test data
-    await prisma.acquisitionItem.deleteMany({
+    await context.prisma.acquisitionItem.deleteMany({
       where: {
         acquisition: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       },
     });
-    await prisma.acquisition.deleteMany({
+    await context.prisma.acquisition.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-    await prisma.animal.deleteMany({
+    await context.prisma.animal.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.acquisitionItem.deleteMany({
+    await context.prisma.acquisitionItem.deleteMany({
       where: {
         acquisition: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       },
     });
-    await prisma.acquisition.deleteMany({
+    await context.prisma.acquisition.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-    await prisma.animal.deleteMany({
+    await context.prisma.animal.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.acquisitionItem.deleteMany({
-      where: {
-        acquisition: {
-          companyId: testCompany.id,
-        },
-      },
-    });
-    await prisma.acquisition.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.animal.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.supplier.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.property.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('create with real database', () => {
     it('should create an acquisition with items and create animals', async () => {
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
@@ -225,16 +102,16 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result).toMatchObject({
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: new Date('2020-01-15'),
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
         totalPrice: 10000.0,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(result.id).toBeDefined();
       expect(result.acquisitionItems).toBeDefined();
@@ -244,7 +121,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       const animals = await prisma.animal.findMany({
         where: {
           code: { in: ['001', '002'] },
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       expect(animals.length).toBe(2);
@@ -261,8 +138,8 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
 
     it('should create acquisition with TOTAL pricing mode', async () => {
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.TOTAL,
         paymentMethod: 'cash_flow',
@@ -283,7 +160,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result.pricingMode).toBe(PricingMode.TOTAL);
       expect(result.totalPrice).toBe(15000.0);
@@ -299,8 +176,8 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
 
     it('should calculate fees correctly', async () => {
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
@@ -321,7 +198,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result.fees).toBeDefined();
       expect(Array.isArray(result.fees)).toBe(true);
@@ -337,7 +214,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: 'EXISTING-001',
           registrationNumber: 'BR-2019-EX0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -347,14 +224,14 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: 'EXISTING-002',
           registrationNumber: 'BR-2019-EX0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
@@ -373,7 +250,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result.acquisitionItems.length).toBe(2);
       expect(
@@ -390,19 +267,19 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
 
     it('should fail with duplicate animal code', async () => {
       // Create animal with code 001
-      await prisma.animal.create({
+      await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
@@ -476,7 +353,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -492,12 +369,13 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
+      animalId = animal.id;
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -533,7 +411,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -572,7 +450,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -588,12 +466,12 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -609,8 +487,8 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
 
       expect(result).toMatchObject({
         id: acquisitionId,
-        propertyId: testProperty.id,
-        supplierId: testSupplier.id,
+        propertyId: context.testProperty.id,
+        supplierId: context.testSupplier.id,
       });
     });
 
@@ -620,7 +498,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -637,7 +515,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -653,12 +531,12 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,

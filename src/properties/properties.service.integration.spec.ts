@@ -1,126 +1,54 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { PropertiesService } from './properties.service';
-import { PrismaService } from '../common/services/prisma.service';
 import { CreatePropertyDto, UpdatePropertyDto } from './dto';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  createServiceTestingModule,
+  getServiceFromModule,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('PropertiesService Integration Tests', () => {
   let service: PropertiesService;
-  let prisma: PrismaClient;
-  let testCompany: any;
-  let testUser: any;
+  let context: IntegrationTestContext;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-55',
+      companyName: 'Test Properties Company',
+      email: 'properties@testcompany.com',
+      userEmail: 'user-properties@testcompany.com',
     });
+  });
 
-    // Ensure database connection
-    await prisma.$connect();
-
-    // Create test company
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Properties Company',
-        email: 'properties@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
-    const hashedPassword = await require('bcrypt').hash('password123', 10);
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'user-properties@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['property'],
     });
   });
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PropertiesService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-        Logger,
-      ],
-    }).compile();
-
-    service = module.get<PropertiesService>(PropertiesService);
+    const module = await createServiceTestingModule(
+      PropertiesService,
+      context.prisma,
+    );
+    service = getServiceFromModule(module, PropertiesService);
 
     // Clean up existing test data
-    await prisma.property.deleteMany({
+    await context.prisma.property.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.property.deleteMany({
+    await context.prisma.property.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.property.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('create with real database', () => {
@@ -138,13 +66,13 @@ describeOrSkip('PropertiesService Integration Tests', () => {
         zipCode: '88395-000',
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result).toMatchObject({
         code: '001',
         name: 'Test Property',
         status: 'active',
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(result.id).toBeDefined();
       expect(result.createdAt).toBeDefined();
@@ -240,13 +168,13 @@ describeOrSkip('PropertiesService Integration Tests', () => {
       expect(result.code).toBe('DUPLICATE-001');
 
       // Cleanup
-      await prisma.property.deleteMany({
+      await context.prisma.property.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.user.deleteMany({
+      await context.prisma.user.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });
@@ -255,14 +183,14 @@ describeOrSkip('PropertiesService Integration Tests', () => {
   describe('findAll with real database', () => {
     it('should return all properties for company', async () => {
       // Create test properties
-      await prisma.property.createMany({
+      await context.prisma.property.createMany({
         data: [
           {
             code: '001',
             name: 'Property 1',
             area: { value: 100, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Test Street',
             number: '123',
             neighborhood: 'Test Neighborhood',
@@ -275,7 +203,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
             name: 'Property 2',
             area: { value: 200, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Test Street',
             number: '123',
             neighborhood: 'Test Neighborhood',
@@ -288,7 +216,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
             name: 'Deleted Property',
             area: { value: 300, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Test Street',
             number: '123',
             neighborhood: 'Test Neighborhood',
@@ -317,7 +245,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
           name: 'Test Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',
@@ -355,7 +283,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
           name: 'Test Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',

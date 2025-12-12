@@ -1,32 +1,25 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
 import * as bcrypt from 'bcrypt';
 import {
   createTestCompany,
   cleanupTestData,
   createTestPayment,
 } from './test-utils';
+import { createTestApp } from './e2e-test-helpers';
 
 describe('Authentication with Subscription Model (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
+  let prisma: any;
   let testCompany: any;
   let testUser: any;
   let testSubscription: any;
   let testPlan: any;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    await app.init();
+    const testApp = await createTestApp();
+    app = testApp.app;
+    prisma = testApp.prisma;
   });
 
   beforeEach(async () => {

@@ -1,109 +1,34 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
 
 describe('Locations Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let testProperty: any;
-  let authToken: string;
-  let mainUserToken: string;
+  let context: E2ETestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'Locations Test Company',
       email: 'locations@testcompany.com',
       cnpj: '11.222.333/0001-55',
       planName: 'Avançado',
       isTrial: true,
+      createProperty: true,
     });
-
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    mainUserToken = loginResponse.body.access_token;
 
     // Create a test property
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
+    // Property is already created by setupE2ETest with createProperty: true
 
     // Create a regular user with limited permissions
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    const regularUser = await prisma.user.create({
+    const regularUser = await context.prisma.user.create({
       data: {
         name: 'Regular User',
         email: 'regular@testcompany.com',
         phone: '(47) 88888-8888',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -115,7 +40,7 @@ describe('Locations Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -123,7 +48,7 @@ describe('Locations Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
@@ -143,9 +68,8 @@ describe('Locations Management Flow (e2e)', () => {
 
     it('should create a location successfully (main user)', async () => {
       const dto = { ...createLocationDto, propertyId: testProperty.id };
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -154,8 +78,8 @@ describe('Locations Management Flow (e2e)', () => {
         name: dto.name,
         locationType: dto.locationType,
         status: dto.status,
-        companyId: testCompany.id,
-        propertyId: testProperty.id,
+        companyId: context.testCompany.id,
+        propertyId: context.testProperty.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.createdAt).toBeDefined();
@@ -169,7 +93,7 @@ describe('Locations Management Flow (e2e)', () => {
           ...createLocationDto,
           code: `00${locationTypes.indexOf(locationType) + 2}`,
           locationType,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         };
 
         const response = await request(app.getHttpServer())
@@ -186,7 +110,7 @@ describe('Locations Management Flow (e2e)', () => {
       const dto = { ...createLocationDto, propertyId: testProperty.id };
       await request(app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
         .expect(403);
     });
@@ -217,7 +141,7 @@ describe('Locations Management Flow (e2e)', () => {
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -306,7 +230,7 @@ describe('Locations Management Flow (e2e)', () => {
         .send({
           ...createLocationDto,
           code: '004',
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           locationType: 'invalid_type',
         })
         .expect(400);
@@ -319,7 +243,7 @@ describe('Locations Management Flow (e2e)', () => {
         .send({
           ...createLocationDto,
           code: '005',
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           area: { value: 100, type: 'invalid_type' },
         })
         .expect(400);
@@ -331,13 +255,12 @@ describe('Locations Management Flow (e2e)', () => {
       const dto = {
         ...createLocationDto,
         code: '006',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         area: { value: '42.5' as any, type: 'hectares' }, // Send as string
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -346,8 +269,8 @@ describe('Locations Management Flow (e2e)', () => {
         name: dto.name,
         locationType: dto.locationType,
         status: dto.status,
-        companyId: testCompany.id,
-        propertyId: testProperty.id,
+        companyId: context.testCompany.id,
+        propertyId: context.testProperty.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.createdAt).toBeDefined();
@@ -361,7 +284,7 @@ describe('Locations Management Flow (e2e)', () => {
       const dto = {
         ...createLocationDto,
         code: '007',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         area: { value: 'not-a-number' as any, type: 'hectares' },
       };
 
@@ -376,7 +299,7 @@ describe('Locations Management Flow (e2e)', () => {
   describe('GET /locations', () => {
     beforeEach(async () => {
       // Create test locations
-      await prisma.location.createMany({
+      await context.prisma.location.createMany({
         data: [
           {
             code: '001',
@@ -384,8 +307,8 @@ describe('Locations Management Flow (e2e)', () => {
             locationType: 'pasture',
             area: { value: 28.5, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '002',
@@ -393,8 +316,8 @@ describe('Locations Management Flow (e2e)', () => {
             locationType: 'barn',
             area: { value: 15.0, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '003',
@@ -402,8 +325,8 @@ describe('Locations Management Flow (e2e)', () => {
             locationType: 'storage',
             area: { value: 10.0, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
             deletedAt: new Date(), // Soft deleted
           },
         ],
@@ -411,9 +334,8 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should return all locations for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -425,9 +347,8 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted locations', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       const codes = response.body.map((l: any) => l.code);
@@ -442,7 +363,7 @@ describe('Locations Management Flow (e2e)', () => {
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -452,14 +373,14 @@ describe('Locations Management Flow (e2e)', () => {
         },
       });
 
-      await prisma.location.create({
+      await context.prisma.location.create({
         data: {
           code: '004',
           name: 'Other Property Location',
           locationType: 'pasture',
           area: { value: 30.0, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: otherProperty.id,
         },
       });
@@ -477,7 +398,7 @@ describe('Locations Management Flow (e2e)', () => {
 
     it('should fail without view permission', async () => {
       // Update regular user to have no view permission
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { email: 'regular@testcompany.com' },
         data: {
           permissions: {
@@ -514,8 +435,8 @@ describe('Locations Management Flow (e2e)', () => {
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;
@@ -544,7 +465,7 @@ describe('Locations Management Flow (e2e)', () => {
 
     it('should return 404 for soft-deleted location', async () => {
       // Soft delete the location
-      await prisma.location.update({
+      await context.prisma.location.update({
         where: { id: locationId },
         data: { deletedAt: new Date() },
       });
@@ -567,8 +488,8 @@ describe('Locations Management Flow (e2e)', () => {
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;
@@ -610,22 +531,22 @@ describe('Locations Management Flow (e2e)', () => {
     it('should fail without edit permission', async () => {
       await request(app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ name: 'Updated Name' })
         .expect(403);
     });
 
     it('should fail with duplicate code in same property', async () => {
       // Create another location
-      await prisma.location.create({
+      await context.prisma.location.create({
         data: {
           code: '002',
           name: 'Other Location',
           locationType: 'barn',
           area: { value: 15.0, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -645,7 +566,7 @@ describe('Locations Management Flow (e2e)', () => {
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -738,8 +659,8 @@ describe('Locations Management Flow (e2e)', () => {
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;
@@ -775,7 +696,7 @@ describe('Locations Management Flow (e2e)', () => {
     it('should fail without remove permission', async () => {
       await request(app.getHttpServer())
         .delete(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
@@ -804,7 +725,7 @@ describe('Locations Management Flow (e2e)', () => {
 
       otherUser = otherTestData.user;
 
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherUser.id },
         data: {
           status: 'active',
@@ -830,8 +751,8 @@ describe('Locations Management Flow (e2e)', () => {
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;

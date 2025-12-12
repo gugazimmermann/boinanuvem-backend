@@ -1,148 +1,55 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { LocationsService } from './locations.service';
-import { PrismaService } from '../common/services/prisma.service';
 import { CreateLocationDto, UpdateLocationDto } from './dto';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  createServiceTestingModule,
+  getServiceFromModule,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('LocationsService Integration Tests', () => {
   let service: LocationsService;
-  let prisma: PrismaClient;
-  let testCompany: any;
-  let testProperty: any;
-  let testUser: any;
+  let context: IntegrationTestContext;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-55',
+      companyName: 'Test Locations Company',
+      email: 'locations@testcompany.com',
+      userEmail: 'user-locations@testcompany.com',
+      createProperty: true,
     });
+  });
 
-    // Ensure database connection
-    await prisma.$connect();
-
-    // Create test company
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Locations Company',
-        email: 'locations@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
-
-    const hashedPassword = await require('bcrypt').hash('password123', 10);
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'user-locations@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['location'],
     });
   });
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LocationsService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-        Logger,
-      ],
-    }).compile();
-
-    service = module.get<LocationsService>(LocationsService);
+    const module = await createServiceTestingModule(
+      LocationsService,
+      context.prisma,
+    );
+    service = getServiceFromModule(module, LocationsService);
 
     // Clean up existing test data
-    await prisma.location.deleteMany({
+    await context.prisma.location.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.location.deleteMany({
+    await context.prisma.location.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.location.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.property.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('create with real database', () => {
@@ -153,24 +60,24 @@ describeOrSkip('LocationsService Integration Tests', () => {
         locationType: 'pasture',
         area: { value: 28.5, type: 'hectares' },
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result).toMatchObject({
         code: '001',
         name: 'Test Location',
         locationType: 'pasture',
         status: 'active',
-        companyId: testCompany.id,
-        propertyId: testProperty.id,
+        companyId: context.testCompany.id,
+        propertyId: context.testProperty.id,
       });
       expect(result.id).toBeDefined();
       expect(result.createdAt).toBeDefined();
 
       // Verify in database
-      const location = await prisma.location.findUnique({
+      const location = await context.prisma.location.findUnique({
         where: { id: result.id },
       });
       expect(location).toBeDefined();
@@ -184,26 +91,26 @@ describeOrSkip('LocationsService Integration Tests', () => {
         locationType: 'pasture',
         area: { value: 28.5, type: 'hectares' },
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
       await service.create(testUser.id, createDto);
 
       // Try to create duplicate
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Location with this code already exists',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Location with this code already exists');
     });
 
     it('should allow same code for different properties', async () => {
       // Create another property
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '002',
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -219,7 +126,7 @@ describeOrSkip('LocationsService Integration Tests', () => {
         locationType: 'pasture',
         area: { value: 28.5, type: 'hectares' },
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
       const createDto2: CreateLocationDto = {
@@ -245,14 +152,14 @@ describeOrSkip('LocationsService Integration Tests', () => {
         propertyId: 'non-existent-property-id',
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property not found');
     });
 
     it('should fail if property belongs to different company', async () => {
       // Create another company
-      const otherCompany = await prisma.company.create({
+      const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
@@ -270,7 +177,7 @@ describeOrSkip('LocationsService Integration Tests', () => {
         },
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -295,15 +202,15 @@ describeOrSkip('LocationsService Integration Tests', () => {
         propertyId: otherProperty.id,
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property not found');
 
       // Cleanup
-      await prisma.property.deleteMany({
+      await context.prisma.property.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });
@@ -312,7 +219,7 @@ describeOrSkip('LocationsService Integration Tests', () => {
   describe('findAll with real database', () => {
     it('should return all locations for company', async () => {
       // Create test locations
-      await prisma.location.createMany({
+      await context.prisma.location.createMany({
         data: [
           {
             code: '001',
@@ -320,8 +227,8 @@ describeOrSkip('LocationsService Integration Tests', () => {
             locationType: 'pasture',
             area: { value: 28.5, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '002',
@@ -329,8 +236,8 @@ describeOrSkip('LocationsService Integration Tests', () => {
             locationType: 'barn',
             area: { value: 15.0, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '003',
@@ -338,14 +245,14 @@ describeOrSkip('LocationsService Integration Tests', () => {
             locationType: 'storage',
             area: { value: 10.0, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
             deletedAt: new Date(), // Soft deleted
           },
         ],
       });
 
-      const result = await service.findAll(testUser.id);
+      const result = await service.findAll(context.testUser.id);
 
       expect(result.length).toBe(2); // Excludes soft-deleted
       expect(result.every((l) => l.deletedAt === undefined)).toBe(true);
@@ -356,15 +263,15 @@ describeOrSkip('LocationsService Integration Tests', () => {
     let locationId: string;
 
     beforeEach(async () => {
-      const location = await prisma.location.create({
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'Test Location',
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;
@@ -376,7 +283,11 @@ describeOrSkip('LocationsService Integration Tests', () => {
         status: 'inactive',
       };
 
-      const result = await service.update(testUser.id, locationId, updateDto);
+      const result = await service.update(
+        context.testUser.id,
+        locationId,
+        updateDto,
+      );
 
       expect(result).toMatchObject({
         id: locationId,
@@ -390,35 +301,35 @@ describeOrSkip('LocationsService Integration Tests', () => {
     let locationId: string;
 
     beforeEach(async () => {
-      const location = await prisma.location.create({
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'Test Location',
           locationType: 'pasture',
           area: { value: 28.5, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       locationId = location.id;
     });
 
     it('should soft delete a location', async () => {
-      const result = await service.remove(testUser.id, locationId);
+      const result = await service.remove(context.testUser.id, locationId);
 
       expect(result).toEqual({
         message: 'Location deleted successfully',
       });
 
       // Verify soft delete
-      const deletedLocation = await prisma.location.findUnique({
+      const deletedLocation = await context.prisma.location.findUnique({
         where: { id: locationId },
       });
       expect(deletedLocation?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResult = await service.findAll(testUser.id);
+      const listResult = await service.findAll(context.testUser.id);
       expect(listResult.find((l) => l.id === locationId)).toBeUndefined();
     });
   });

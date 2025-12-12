@@ -145,7 +145,7 @@ describe('HealthController', () => {
         'Performing comprehensive health check',
       );
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Health check completed successfully',
+        'comprehensive health check completed successfully',
       );
 
       loggerSpy.mockRestore();
@@ -163,7 +163,7 @@ describe('HealthController', () => {
       expect(() => controller.check()).toThrow();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Health check failed',
+        'comprehensive health check failed',
         error.stack,
       );
 
@@ -307,7 +307,7 @@ describe('HealthController', () => {
 
       expect(loggerSpy).toHaveBeenCalledWith('Performing readiness check');
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Readiness check completed successfully',
+        'readiness check completed successfully',
       );
 
       loggerSpy.mockRestore();
@@ -325,7 +325,7 @@ describe('HealthController', () => {
       expect(() => controller.checkReadiness()).toThrow();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Readiness check failed',
+        'readiness check failed',
         error.stack,
       );
 
@@ -346,7 +346,7 @@ describe('HealthController', () => {
       expect(() => controller.check()).toThrow();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Health check failed',
+        'comprehensive health check failed',
         nonError.stack,
       );
 
@@ -384,7 +384,7 @@ describe('HealthController', () => {
       expect(() => controller.checkReadiness()).toThrow();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Readiness check failed',
+        'readiness check failed',
         nonError.stack,
       );
 

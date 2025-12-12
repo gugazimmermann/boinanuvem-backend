@@ -1,113 +1,28 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
+import { createTestSupplier } from './test-data-factories';
 
 describe('Acquisitions Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let testProperty: any;
+  let context: E2ETestContext;
   let testSupplier: any;
-  let authToken: string;
-  let mainUserToken: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'Acquisitions Test Company',
       email: 'acquisitions@testcompany.com',
       cnpj: '11.222.333/0001-55',
       planName: 'Avançado',
       isTrial: true,
+      createProperty: true,
     });
 
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    mainUserToken = loginResponse.body.access_token;
-
-    // Create a test property
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
-
-    // Create a test supplier
-    testSupplier = await prisma.supplier.create({
-      data: {
-        code: '001',
-        name: 'Test Supplier',
-        companyId: testCompany.id,
-        properties: {
-          create: {
-            propertyId: testProperty.id,
-          },
-        },
-      },
+    testSupplier = await createTestSupplier(context.prisma, {
+      code: '001',
+      name: 'Test Supplier',
+      companyId: context.testCompany.id,
     });
 
     // Create a regular user with limited permissions
@@ -118,7 +33,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         email: 'regular@testcompany.com',
         phone: '(47) 88888-8888',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -178,24 +93,23 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should create an acquisition with items successfully', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
       expect(response.body).toMatchObject({
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         acquisitionDate: expect.stringMatching(/^2020-01-15/),
         pricingMode: 'individual',
         paymentMethod: 'cash_flow',
         totalPrice: 10000.0,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.acquisitionItems).toBeDefined();
@@ -205,7 +119,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
       const animals = await prisma.animal.findMany({
         where: {
           code: { in: ['001', '002'] },
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       expect(animals.length).toBe(2);
@@ -214,7 +128,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should create acquisition with TOTAL pricing mode', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         pricingMode: 'total',
         totalPrice: 15000.0,
@@ -234,9 +148,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -253,7 +166,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should create acquisition with fees', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         fees: [
           { id: 'fee-001', name: 'Transportation', amount: 500.0 },
@@ -271,9 +184,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -289,7 +201,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: 'EXISTING-001',
           registrationNumber: 'BR-2019-EX0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -299,14 +211,14 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: 'EXISTING-002',
           registrationNumber: 'BR-2019-EX0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         acquisitionItems: [
           {
@@ -322,9 +234,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -344,7 +255,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should calculate cost per arroba correctly', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         acquisitionItems: [
           {
@@ -356,9 +267,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -369,7 +279,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should fail without add permission', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
       };
       await request(app.getHttpServer())
@@ -407,19 +317,19 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
     it('should fail with duplicate animal code', async () => {
       // Create animal with code 001
-      await prisma.animal.create({
+      await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         acquisitionItems: [
           {
@@ -480,7 +390,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
       // Create test acquisitions
       const acquisition1 = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -495,12 +405,12 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition1.id,
           animalId: animal1.id,
@@ -512,7 +422,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
       const acquisition2 = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-02-20'),
@@ -526,9 +436,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should return all acquisitions for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -539,9 +448,8 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted acquisitions', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       const ids = response.body.map((a: any) => a.id);
@@ -550,7 +458,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
     it('should fail without view permission', async () => {
       // Update regular user to have no view permission
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { email: 'regular@testcompany.com' },
         data: {
           permissions: {
@@ -587,7 +495,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -603,12 +511,12 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -627,7 +535,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
       expect(response.body).toMatchObject({
         id: acquisitionId,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
         pricingMode: 'individual',
         paymentMethod: 'cash_flow',
@@ -646,7 +554,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
     it('should return 404 for soft-deleted acquisition', async () => {
       // Soft delete the acquisition
-      await prisma.acquisition.update({
+      await context.prisma.acquisition.update({
         where: { id: acquisitionId },
         data: { deletedAt: new Date() },
       });
@@ -665,7 +573,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -681,12 +589,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
+      animalId = animal.id;
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -705,7 +614,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
       expect(response.body).toMatchObject({
         id: acquisitionId,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
       });
     });
@@ -716,7 +625,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -777,7 +686,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -793,12 +702,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
+      animalId = animal.id;
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -834,7 +744,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
@@ -917,7 +827,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     beforeEach(async () => {
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
@@ -933,12 +843,12 @@ describe('Acquisitions Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
         },
       });
 
-      await prisma.acquisitionItem.create({
+      await context.prisma.acquisitionItem.create({
         data: {
           acquisitionId: acquisition.id,
           animalId: animal.id,
@@ -1008,7 +918,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
       otherUser = otherTestData.user;
 
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherUser.id },
         data: {
           status: 'active',
@@ -1029,7 +939,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
       // Create acquisition for first company
       const acquisition = await prisma.acquisition.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           propertyId: testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),

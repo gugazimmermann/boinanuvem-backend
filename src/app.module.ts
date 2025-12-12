@@ -21,6 +21,16 @@ import { BuyersModule } from './buyers/buyers.module';
 import { AnimalsModule } from './animals/animals.module';
 import { BirthsModule } from './births/births.module';
 import { AcquisitionsModule } from './acquisitions/acquisitions.module';
+import { SalesModule } from './sales/sales.module';
+import { DeathsModule } from './deaths/deaths.module';
+import { WeighingsModule } from './weighings/weighings.module';
+import { InventoryItemsModule } from './inventory-items/inventory-items.module';
+import { BreedingsModule } from './breedings/breedings.module';
+import { SanitaryControlsModule } from './sanitary-controls/sanitary-controls.module';
+import { CashFlowModule } from './cash-flow/cash-flow.module';
+import { AccountsPayableModule } from './accounts-payable/accounts-payable.module';
+import { AccountsReceivableModule } from './accounts-receivable/accounts-receivable.module';
+import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -62,6 +72,16 @@ import securityConfig from './common/config/security.config';
     AnimalsModule,
     BirthsModule,
     AcquisitionsModule,
+    SalesModule,
+    DeathsModule,
+    WeighingsModule,
+    InventoryItemsModule,
+    BreedingsModule,
+    SanitaryControlsModule,
+    CashFlowModule,
+    AccountsPayableModule,
+    AccountsReceivableModule,
+    BankAccountsModule,
   ],
   controllers: [AppController],
   providers: [

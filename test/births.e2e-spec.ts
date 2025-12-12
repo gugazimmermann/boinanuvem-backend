@@ -1,82 +1,21 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
 
 describe('Births Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let testProperty: any;
-  let authToken: string;
-  let mainUserToken: string;
+  let context: E2ETestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'Births Test Company',
       email: 'births@testcompany.com',
       cnpj: '11.222.333/0001-55',
       planName: 'Avançado',
       isTrial: true,
+      createProperty: true,
     });
-
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    mainUserToken = loginResponse.body.access_token;
 
     // Create a test property
     testProperty = await prisma.property.create({
@@ -85,7 +24,7 @@ describe('Births Management Flow (e2e)', () => {
         name: 'Test Property',
         area: { value: 100, type: 'hectares' },
         status: 'active',
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         street: 'Test Street',
         number: '123',
         neighborhood: 'Test Neighborhood',
@@ -103,7 +42,7 @@ describe('Births Management Flow (e2e)', () => {
         email: 'regular@testcompany.com',
         phone: '(47) 88888-8888',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -141,15 +80,14 @@ describe('Births Management Flow (e2e)', () => {
 
     it('should create a birth record and animal successfully', async () => {
       const dto = { ...createBirthDto, propertyId: testProperty.id };
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
       expect(response.body).toMatchObject({
         birthDate: expect.stringMatching(/^2020-01-15/),
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.animalId).toBeDefined();
@@ -169,14 +107,13 @@ describe('Births Management Flow (e2e)', () => {
         ...createBirthDto,
         code: '002',
         registrationNumber: 'BR-2020-FJ0002',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         breed: 'nelore',
         gender: 'male',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -189,12 +126,11 @@ describe('Births Management Flow (e2e)', () => {
         ...createBirthDto,
         code: '003',
         registrationNumber: 'BR-2020-FJ0003',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -209,8 +145,8 @@ describe('Births Management Flow (e2e)', () => {
           code: 'MOTHER-001',
           registrationNumber: 'BR-2019-MJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -219,31 +155,31 @@ describe('Births Management Flow (e2e)', () => {
           code: 'FATHER-001',
           registrationNumber: 'BR-2018-MJ0002',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
       // Create birth records for parents
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: mother.id,
           birthDate: new Date('2019-01-15'),
           breed: 'nelore',
           gender: 'female',
           purity: 'po',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
 
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: father.id,
           birthDate: new Date('2018-01-15'),
           breed: 'nelore',
           gender: 'male',
           purity: 'po',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
 
@@ -251,15 +187,14 @@ describe('Births Management Flow (e2e)', () => {
         ...createBirthDto,
         code: '004',
         registrationNumber: 'BR-2020-FJ0004',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         motherId: mother.id,
         fatherId: father.id,
         breed: 'nelore',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dto)
         .expect(201);
 
@@ -348,7 +283,7 @@ describe('Births Management Flow (e2e)', () => {
         ...createBirthDto,
         code: '005',
         registrationNumber: 'BR-2020-FJ0005',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         motherId: otherMother.id,
       };
 
@@ -375,7 +310,7 @@ describe('Births Management Flow (e2e)', () => {
           ...createBirthDto,
           code: '007',
           registrationNumber: 'BR-2020-FJ0007',
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           birthDate: 'invalid-date',
         })
         .expect(400);
@@ -392,18 +327,18 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: animal1.id,
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
 
@@ -412,8 +347,8 @@ describe('Births Management Flow (e2e)', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -423,7 +358,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-02-20'),
           breed: 'angus',
           gender: 'female',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           deletedAt: new Date(), // Soft deleted
         },
       });
@@ -431,9 +366,8 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should return all births for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -444,9 +378,8 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted births', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       const ids = response.body.map((b: any) => b.id);
@@ -455,7 +388,7 @@ describe('Births Management Flow (e2e)', () => {
 
     it('should fail without view permission', async () => {
       // Update regular user to have no view permission
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { email: 'regular@testcompany.com' },
         data: {
           permissions: {
@@ -496,10 +429,11 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
+      animalId = animal.id;
 
       const birth = await prisma.birth.create({
         data: {
@@ -507,7 +441,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       birthId = birth.id;
@@ -537,7 +471,7 @@ describe('Births Management Flow (e2e)', () => {
 
     it('should return 404 for soft-deleted birth', async () => {
       // Soft delete the birth
-      await prisma.birth.update({
+      await context.prisma.birth.update({
         where: { id: birthId },
         data: { deletedAt: new Date() },
       });
@@ -559,10 +493,11 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
+      animalId = animal.id;
 
       const birth = await prisma.birth.create({
         data: {
@@ -570,7 +505,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       birthId = birth.id;
@@ -595,8 +530,8 @@ describe('Births Management Flow (e2e)', () => {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -658,8 +593,8 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -669,7 +604,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       birthId = birth.id;
@@ -715,8 +650,8 @@ describe('Births Management Flow (e2e)', () => {
           code: 'MOTHER-001',
           registrationNumber: 'BR-2019-MJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -725,8 +660,8 @@ describe('Births Management Flow (e2e)', () => {
           code: 'FATHER-001',
           registrationNumber: 'BR-2018-MJ0002',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -810,8 +745,8 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -821,7 +756,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       birthId = birth.id;
@@ -886,7 +821,7 @@ describe('Births Management Flow (e2e)', () => {
 
       otherUser = otherTestData.user;
 
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherUser.id },
         data: {
           status: 'active',
@@ -910,8 +845,8 @@ describe('Births Management Flow (e2e)', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -921,7 +856,7 @@ describe('Births Management Flow (e2e)', () => {
           birthDate: new Date('2020-01-15'),
           breed: 'nelore',
           gender: 'male',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
         },
       });
       birthId = birth.id;

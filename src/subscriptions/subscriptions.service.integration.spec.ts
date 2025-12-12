@@ -1,42 +1,31 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { SubscriptionsService } from './subscriptions.service';
-import { PrismaService } from '../common/services/prisma.service';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  createServiceTestingModule,
+  getServiceFromModule,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('SubscriptionsService Integration Tests', () => {
   let service: SubscriptionsService;
-  let prisma: PrismaClient;
-  let testCompany: any;
+  let context: IntegrationTestContext;
   let testPlan: any;
   let testUser: any;
   let mainUser: any;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-55',
+      companyName: 'Test Subscriptions Company',
+      email: 'subscriptions@testcompany.com',
+      userEmail: 'main-user@testcompany.com',
     });
-
-    // Ensure database connection
-    await prisma.$connect();
+    mainUser = context.testUser;
 
     // Create test plan
-    testPlan = await prisma.plan.create({
+    testPlan = await context.prisma.plan.create({
       data: {
         name: 'Test Plan',
         description: 'Test plan for integration testing',
@@ -54,47 +43,14 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       },
     });
 
-    // Create test company
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Subscriptions Company',
-        email: 'subscriptions@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    mainUser = await prisma.user.create({
-      data: {
-        name: 'Main User',
-        email: 'main-user@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
-    });
-
-    testUser = await prisma.user.create({
+    testUser = await context.prisma.user.create({
       data: {
         name: 'Test User',
         email: 'user-subscriptions@testcompany.com',
         phone: '(47) 99999-7777',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -103,69 +59,42 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     });
   });
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SubscriptionsService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-        Logger,
-      ],
-    }).compile();
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['companySubscription'],
+    });
+    await context.prisma.plan.deleteMany({
+      where: { name: 'Test Plan' },
+    });
+  });
 
-    service = module.get<SubscriptionsService>(SubscriptionsService);
+  beforeEach(async () => {
+    const module = await createServiceTestingModule(
+      SubscriptionsService,
+      context.prisma,
+    );
+    service = getServiceFromModule(module, SubscriptionsService);
 
     // Clean up existing test subscriptions
-    await prisma.companySubscription.deleteMany({
+    await context.prisma.companySubscription.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.companySubscription.deleteMany({
+    await context.prisma.companySubscription.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.companySubscription.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-    await prisma.plan.deleteMany({
-      where: {
-        id: testPlan.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('createSubscription with real database', () => {
     it('should create a subscription successfully', async () => {
       const dto = {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: testPlan.id,
         billingCycle: 'monthly' as const,
       };
@@ -173,7 +102,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       const result = await service.createSubscription(dto, mainUser.id);
 
       expect(result).toMatchObject({
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: testPlan.id,
         billingCycle: 'monthly',
         status: 'active',
@@ -193,7 +122,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       // Create existing subscription
       const existingSubscription = await prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',
@@ -222,7 +151,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       });
 
       const dto = {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: newPlan.id,
         billingCycle: 'annual' as const,
       };
@@ -241,17 +170,17 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       expect(result.status).toBe('active');
 
       // Cleanup - delete subscription first to avoid foreign key constraint
-      await prisma.companySubscription.deleteMany({
+      await context.prisma.companySubscription.deleteMany({
         where: { planId: newPlan.id },
       });
-      await prisma.plan.deleteMany({
+      await context.prisma.plan.deleteMany({
         where: { id: newPlan.id },
       });
     });
 
     it('should fail if user is not main user', async () => {
       const dto = {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: testPlan.id,
         billingCycle: 'monthly' as const,
       };
@@ -263,7 +192,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
     it('should fail if plan does not exist', async () => {
       const dto = {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: 'non-existent-plan-id',
         billingCycle: 'monthly' as const,
       };
@@ -274,6 +203,13 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     });
 
     it('should fail if plan is inactive', async () => {
+      // Clean up any existing plan first
+      await context.prisma.plan
+        .deleteMany({
+          where: { name: 'Inactive Plan' },
+        })
+        .catch(() => {});
+
       const inactivePlan = await prisma.plan.create({
         data: {
           name: 'Inactive Plan',
@@ -293,7 +229,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       });
 
       const dto = {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: inactivePlan.id,
         billingCycle: 'monthly' as const,
       };
@@ -303,7 +239,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       ).rejects.toThrow('Plan not found');
 
       // Cleanup
-      await prisma.plan.deleteMany({
+      await context.prisma.plan.deleteMany({
         where: { id: inactivePlan.id },
       });
     });
@@ -313,7 +249,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     it('should return current active subscription', async () => {
       const subscription = await prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',
@@ -329,7 +265,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
       expect(result).toMatchObject({
         id: subscription.id,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         planId: testPlan.id,
         isActive: true,
       });
@@ -367,7 +303,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       ).rejects.toThrow('Access denied');
 
       // Cleanup
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });
@@ -379,7 +315,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     beforeEach(async () => {
       const subscription = await prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',
@@ -436,10 +372,10 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       expect(result.planId).toBe(newPlan.id);
 
       // Cleanup - delete subscription first to avoid foreign key constraint
-      await prisma.companySubscription.deleteMany({
+      await context.prisma.companySubscription.deleteMany({
         where: { planId: newPlan.id },
       });
-      await prisma.plan.deleteMany({
+      await context.prisma.plan.deleteMany({
         where: { id: newPlan.id },
       });
     });
@@ -461,7 +397,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     beforeEach(async () => {
       const subscription = await prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',
@@ -485,7 +421,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     it('should fail if subscription is a trial', async () => {
       const trialSubscription = await prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',
@@ -508,9 +444,9 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
   describe('getSubscriptionUsage with real database', () => {
     beforeEach(async () => {
-      await prisma.companySubscription.create({
+      await context.prisma.companySubscription.create({
         data: {
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           planId: testPlan.id,
           billingCycle: 'monthly',
           status: 'active',

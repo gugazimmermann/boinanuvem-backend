@@ -83,6 +83,84 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
     console.log('CompanySubscription table not found, skipping cleanup');
   }
 
+  // Clean up sale items (child table, must be cleaned before sales)
+  try {
+    await prisma.saleItem.deleteMany({
+      where: {
+        sale: {
+          company: {
+            OR: [
+              { companyName: { contains: 'Test' } },
+              { companyName: { contains: 'E2E' } },
+              { email: { contains: 'test' } },
+              { email: { contains: 'registration' } },
+              { email: { contains: 'company' } },
+            ],
+          },
+        },
+      },
+    });
+  } catch {
+    console.log('SaleItem table not found, skipping cleanup');
+  }
+
+  // Clean up sales
+  try {
+    await prisma.sale.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    console.log('Sale table not found, skipping cleanup');
+  }
+
+  // Clean up deaths
+  try {
+    await prisma.death.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    console.log('Death table not found, skipping cleanup');
+  }
+
+  // Clean up weighings
+  try {
+    await prisma.weighing.deleteMany({
+      where: {
+        company: {
+          OR: [
+            { companyName: { contains: 'Test' } },
+            { companyName: { contains: 'E2E' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'company' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    console.log('Weighing table not found, skipping cleanup');
+  }
+
   try {
     await prisma.user.deleteMany({
       where: {

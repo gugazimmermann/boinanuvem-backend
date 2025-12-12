@@ -1,75 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../email/email.service';
 import { TrialService } from '../common/services/trial.service';
 import { CreateUserDto, UpdateUserDto, UpdatePermissionsDto } from './dto';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('UsersService Integration Tests', () => {
   let service: UsersService;
-  let prisma: PrismaClient;
-  let testCompany: any;
+  let context: IntegrationTestContext;
   let testUser: any;
   let mainUser: any;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-05',
+      companyName: 'Test Users Company',
+      email: 'users@testcompany.com',
+      userEmail: 'main-user@testcompany.com',
     });
+    mainUser = context.testUser;
+  });
 
-    // Ensure database connection
-    await prisma.$connect();
-
-    // Create test company
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Users Company',
-        email: 'users@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
-    const hashedPassword = await require('bcrypt').hash('password123', 10);
-    mainUser = await prisma.user.create({
-      data: {
-        name: 'Main User',
-        email: 'main-user@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['user'],
     });
   });
 
@@ -89,7 +51,7 @@ describeOrSkip('UsersService Integration Tests', () => {
         UsersService,
         {
           provide: PrismaService,
-          useValue: prisma,
+          useValue: context.prisma,
         },
         {
           provide: AuthService,
@@ -107,9 +69,9 @@ describeOrSkip('UsersService Integration Tests', () => {
     service = module.get<UsersService>(UsersService);
 
     // Clean up existing test users (except main user)
-    await prisma.user.deleteMany({
+    await context.prisma.user.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         email: { not: 'main-user@testcompany.com' },
       },
@@ -117,32 +79,13 @@ describeOrSkip('UsersService Integration Tests', () => {
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.user.deleteMany({
+    await context.prisma.user.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         email: { not: 'main-user@testcompany.com' },
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('createUser with real database', () => {
@@ -171,11 +114,11 @@ describeOrSkip('UsersService Integration Tests', () => {
       // Note: createTeamMember returns selected fields, not full user object
 
       // Verify in database
-      const user = await prisma.user.findUnique({
+      const user = await context.prisma.user.findUnique({
         where: { email: 'test-user@testcompany.com' },
       });
       expect(user).toBeDefined();
-      expect(user?.companyId).toBe(testCompany.id);
+      expect(user?.companyId).toBe(context.testCompany.id);
       expect(user?.mainUser).toBe(false);
     });
 
@@ -198,13 +141,13 @@ describeOrSkip('UsersService Integration Tests', () => {
   describe('updateCurrentUser with real database', () => {
     beforeEach(async () => {
       const hashedPassword = await require('bcrypt').hash('password123', 10);
-      testUser = await prisma.user.create({
+      testUser = await context.prisma.user.create({
         data: {
           name: 'Test User',
           email: 'test-user-update@testcompany.com',
           phone: '(47) 99999-7777',
           password: hashedPassword,
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
           emailVerifiedAt: new Date(),
@@ -227,7 +170,7 @@ describeOrSkip('UsersService Integration Tests', () => {
       });
 
       // Verify in database
-      const user = await prisma.user.findUnique({
+      const user = await context.prisma.user.findUnique({
         where: { id: testUser.id },
       });
       expect(user?.name).toBe('Updated User Name');
@@ -237,13 +180,13 @@ describeOrSkip('UsersService Integration Tests', () => {
     it('should fail with duplicate email', async () => {
       // Create another user
       const hashedPassword = await require('bcrypt').hash('password123', 10);
-      await prisma.user.create({
+      await context.prisma.user.create({
         data: {
           name: 'Other User',
           email: 'other-user@testcompany.com',
           phone: '(47) 99999-6666',
           password: hashedPassword,
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
           emailVerifiedAt: new Date(),
@@ -381,7 +324,7 @@ describeOrSkip('UsersService Integration Tests', () => {
       );
 
       // Verify in database
-      const user = await prisma.user.findUnique({
+      const user = await context.prisma.user.findUnique({
         where: { id: testUser.id },
       });
       expect(user?.permissions).toBeDefined();

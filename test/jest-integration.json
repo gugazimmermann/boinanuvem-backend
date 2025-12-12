@@ -11,5 +11,6 @@
   ],
   "coverageDirectory": "../coverage-integration",
   "testTimeout": 30000,
-  "setupFilesAfterEnv": ["<rootDir>/../test/setup-integration.ts"]
+  "setupFilesAfterEnv": ["<rootDir>/../test/setup-integration.ts"],
+  "maxWorkers": 1
 }

@@ -1,148 +1,55 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { AnimalsService } from './animals.service';
-import { PrismaService } from '../common/services/prisma.service';
 import { CreateAnimalDto, UpdateAnimalDto } from './dto';
-
-// Skip integration tests if database is not available
-const describeOrSkip = process.env.SKIP_INTEGRATION_TESTS
-  ? describe.skip
-  : describe;
+import {
+  describeOrSkip,
+  setupIntegrationTest,
+  teardownIntegrationTest,
+  createServiceTestingModule,
+  getServiceFromModule,
+  IntegrationTestContext,
+} from '../../test/integration-test-helpers';
 
 describeOrSkip('AnimalsService Integration Tests', () => {
   let service: AnimalsService;
-  let prisma: PrismaClient;
-  let testCompany: any;
-  let testProperty: any;
-  let testUser: any;
+  let context: IntegrationTestContext;
 
   beforeAll(async () => {
-    // Use test database URL or in-memory database for testing
-    const testDatabaseUrl =
-      process.env.TEST_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/boinanuvem_test';
-
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
-        },
-      },
+    context = await setupIntegrationTest({
+      cnpj: '11.222.333/0001-04',
+      companyName: 'Test Animals Company',
+      email: 'animals@testcompany.com',
+      userEmail: 'user-animals@testcompany.com',
+      createProperty: true,
     });
+  });
 
-    // Ensure database connection
-    await prisma.$connect();
-
-    // Create test company and property
-    testCompany = await prisma.company.create({
-      data: {
-        cnpj: '11.222.333/0001-55',
-        companyName: 'Test Animals Company',
-        email: 'animals@testcompany.com',
-        phone: '(47) 99999-9999',
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88303-030',
-        trialStartDate: new Date(),
-        trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        trialStatus: 'active',
-      },
-    });
-
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
-
-    const hashedPassword = await require('bcrypt').hash('password123', 10);
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'user-animals@testcompany.com',
-        phone: '(47) 99999-8888',
-        password: hashedPassword,
-        companyId: testCompany.id,
-        mainUser: true,
-        status: 'active',
-        emailVerifiedAt: new Date(),
-        permissions: {},
-      },
+  afterAll(async () => {
+    await teardownIntegrationTest(context, {
+      tables: ['animal'],
     });
   });
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AnimalsService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-        Logger,
-      ],
-    }).compile();
-
-    service = module.get<AnimalsService>(AnimalsService);
+    const module = await createServiceTestingModule(
+      AnimalsService,
+      context.prisma,
+    );
+    service = getServiceFromModule(module, AnimalsService);
 
     // Clean up existing test data
-    await prisma.animal.deleteMany({
+    await context.prisma.animal.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await prisma.animal.deleteMany({
+    await context.prisma.animal.deleteMany({
       where: {
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       },
     });
-  });
-
-  afterAll(async () => {
-    // Clean up test company and related data
-    await prisma.animal.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.property.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        companyId: testCompany.id,
-      },
-    });
-    await prisma.company.deleteMany({
-      where: {
-        id: testCompany.id,
-      },
-    });
-
-    if (prisma) {
-      await prisma.$disconnect();
-    }
   });
 
   describe('create with real database', () => {
@@ -151,17 +58,17 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         code: '001',
         registrationNumber: 'BR-2020-FJ0001',
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result).toMatchObject({
         code: '001',
         registrationNumber: 'BR-2020-FJ0001',
         status: 'active',
-        companyId: testCompany.id,
-        propertyId: testProperty.id,
+        companyId: context.testCompany.id,
+        propertyId: context.testProperty.id,
       });
       expect(result.id).toBeDefined();
       expect(result.createdAt).toBeDefined();
@@ -179,11 +86,11 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         code: '002',
         registrationNumber: 'BR-2020-FJ0002',
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         acquisitionDate: '2020-01-15',
       };
 
-      const result = await service.create(testUser.id, createDto);
+      const result = await service.create(context.testUser.id, createDto);
 
       expect(result.acquisitionDate).toEqual(new Date('2020-01-15'));
     });
@@ -193,7 +100,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         code: '003',
         registrationNumber: 'BR-2020-FJ0003',
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
       await service.create(testUser.id, createDto);
@@ -258,7 +165,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         code: 'DUPLICATE-001',
         registrationNumber: 'BR-2020-FJ0001',
         status: 'active',
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
       };
 
       const createDto2: CreateAnimalDto = {
@@ -276,16 +183,16 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       expect(result.code).toBe('DUPLICATE-001');
 
       // Cleanup
-      await prisma.animal.deleteMany({
+      await context.prisma.animal.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.property.deleteMany({
+      await context.prisma.property.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.user.deleteMany({
+      await context.prisma.user.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });
@@ -351,10 +258,10 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       );
 
       // Cleanup
-      await prisma.property.deleteMany({
+      await context.prisma.property.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });
@@ -363,28 +270,28 @@ describeOrSkip('AnimalsService Integration Tests', () => {
   describe('findAll with real database', () => {
     it('should return all animals for company', async () => {
       // Create test animals
-      await prisma.animal.createMany({
+      await context.prisma.animal.createMany({
         data: [
           {
             code: '001',
             registrationNumber: 'BR-2020-FJ0001',
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '002',
             registrationNumber: 'BR-2020-FJ0002',
             status: 'active',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
           },
           {
             code: '003',
             registrationNumber: 'BR-2020-FJ0003',
             status: 'inactive',
-            companyId: testCompany.id,
-            propertyId: testProperty.id,
+            companyId: context.testCompany.id,
+            propertyId: context.testProperty.id,
             deletedAt: new Date(), // Soft deleted
           },
         ],
@@ -397,13 +304,13 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     });
 
     it('should exclude soft-deleted animals', async () => {
-      await prisma.animal.create({
+      await context.prisma.animal.create({
         data: {
           code: '004',
           registrationNumber: 'BR-2020-FJ0004',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
           deletedAt: new Date(),
         },
       });
@@ -423,8 +330,8 @@ describeOrSkip('AnimalsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -448,7 +355,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     });
 
     it('should fail for soft-deleted animal', async () => {
-      await prisma.animal.update({
+      await context.prisma.animal.update({
         where: { id: animalId },
         data: { deletedAt: new Date() },
       });
@@ -468,8 +375,8 @@ describeOrSkip('AnimalsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -502,13 +409,13 @@ describeOrSkip('AnimalsService Integration Tests', () => {
 
     it('should fail with duplicate code in same company', async () => {
       // Create another animal
-      await prisma.animal.create({
+      await context.prisma.animal.create({
         data: {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -529,7 +436,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -558,8 +465,8 @@ describeOrSkip('AnimalsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -596,6 +503,23 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
+      // Clean up any existing test data first (by email to catch any duplicates)
+      await context.prisma.user
+        .deleteMany({
+          where: { email: 'isolation-user@testcompany.com' },
+        })
+        .catch(() => {});
+      await context.prisma.company
+        .deleteMany({
+          where: {
+            OR: [
+              { cnpj: '99.888.777/0001-11' },
+              { email: 'isolation@testcompany.com' },
+            ],
+          },
+        })
+        .catch(() => {});
+
       // Create another company
       otherCompany = await prisma.company.create({
         data: {
@@ -615,7 +539,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      await prisma.property.create({
+      await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Isolation Property',
@@ -651,24 +575,24 @@ describeOrSkip('AnimalsService Integration Tests', () => {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
-          companyId: testCompany.id,
-          propertyId: testProperty.id,
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
     });
 
     afterEach(async () => {
-      await prisma.animal.deleteMany({
+      await context.prisma.animal.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.property.deleteMany({
+      await context.prisma.property.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.user.deleteMany({
+      await context.prisma.user.deleteMany({
         where: { companyId: otherCompany.id },
       });
-      await prisma.company.deleteMany({
+      await context.prisma.company.deleteMany({
         where: { id: otherCompany.id },
       });
     });

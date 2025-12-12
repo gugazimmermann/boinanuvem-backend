@@ -1,42 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
 import { createTestCompany, cleanupTestData } from './test-utils';
+import { createTestApp, authenticatedRequest } from './e2e-test-helpers';
 
 describe('Company Management Flow (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
+  let prisma: any;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    // Add validation pipe for E2E tests
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
+    const testApp = await createTestApp();
+    app = testApp.app;
+    prisma = testApp.prisma;
   });
 
   beforeEach(async () => {
@@ -266,9 +240,8 @@ describe('Company Management Flow (e2e)', () => {
     });
 
     it('should get company details for authenticated user', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(app, authToken)
         .get(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -292,9 +265,8 @@ describe('Company Management Flow (e2e)', () => {
         isTrial: false,
       });
 
-      await request(app.getHttpServer())
+      await authenticatedRequest(app, authToken)
         .get(`/companies/${otherCompanyData.company.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(403);
     });
 
@@ -362,9 +334,8 @@ describe('Company Management Flow (e2e)', () => {
         state: 'RJ',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(updateData)
         .expect(200);
 
@@ -414,9 +385,8 @@ describe('Company Management Flow (e2e)', () => {
       const teamAuthToken = teamLoginResponse.body.access_token;
 
       // Try to update company (should fail)
-      await request(app.getHttpServer())
+      await authenticatedRequest(app, teamAuthToken)
         .put(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${teamAuthToken}`)
         .send({ companyName: 'Hacked Name' })
         .expect(403);
     });
@@ -431,17 +401,15 @@ describe('Company Management Flow (e2e)', () => {
         isTrial: false,
       });
 
-      await request(app.getHttpServer())
+      await authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'existing@company.com' })
         .expect(409);
     });
 
     it('should validate email format during update', async () => {
-      await request(app.getHttpServer())
+      await authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'invalid-email-format' })
         .expect(400);
     });
@@ -451,9 +419,8 @@ describe('Company Management Flow (e2e)', () => {
         companyName: 'Partially Updated Name',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(partialUpdate)
         .expect(200);
 

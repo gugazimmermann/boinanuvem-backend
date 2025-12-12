@@ -1,52 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/services/prisma.service';
-import { EmailService } from '../src/email/email.service';
-import { createTestCompany, cleanupTestData } from './test-utils';
+import {
+  setupE2ETest,
+  authenticatedRequest,
+  E2ETestContext,
+} from './e2e-test-helpers';
 
 describe('Properties Management Flow (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let testCompany: any;
-  let testUser: any;
-  let authToken: string;
-  let mainUserToken: string;
+  let context: E2ETestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(EmailService)
-      .useValue({
-        sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-        sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-        sendTeamMemberInvitation: jest.fn().mockResolvedValue(undefined),
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
-  });
-
-  beforeEach(async () => {
-    await cleanupTestData(prisma);
-
-    // Create test company with main user
-    const testData = await createTestCompany(prisma, {
+    context = await setupE2ETest({
       companyName: 'Properties Test Company',
       email: 'properties@testcompany.com',
       cnpj: '11.222.333/0001-55',
@@ -54,38 +16,15 @@ describe('Properties Management Flow (e2e)', () => {
       isTrial: true,
     });
 
-    testCompany = testData.company;
-    testUser = testData.user;
-
-    // Activate the user for testing
-    await prisma.user.update({
-      where: { id: testUser.id },
-      data: {
-        status: 'active',
-        emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        email: testUser.email,
-        password: 'password123',
-      })
-      .expect(200);
-
-    mainUserToken = loginResponse.body.access_token;
-
     // Create a regular user with limited permissions
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    const regularUser = await prisma.user.create({
+    const regularUser = await context.prisma.user.create({
       data: {
         name: 'Regular User',
         email: 'regular@testcompany.com',
         phone: '(47) 88888-8888',
         password: hashedPassword,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
         mainUser: false,
         status: 'active',
         emailVerifiedAt: new Date(),
@@ -131,9 +70,8 @@ describe('Properties Management Flow (e2e)', () => {
     };
 
     it('should create a property successfully (main user)', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(createPropertyDto)
         .expect(201);
 
@@ -141,7 +79,7 @@ describe('Properties Management Flow (e2e)', () => {
         code: createPropertyDto.code,
         name: createPropertyDto.name,
         status: createPropertyDto.status,
-        companyId: testCompany.id,
+        companyId: context.testCompany.id,
       });
       expect(response.body.id).toBeDefined();
       expect(response.body.createdAt).toBeDefined();
@@ -165,9 +103,8 @@ describe('Properties Management Flow (e2e)', () => {
         breedingSeasonModifiedByUser: true,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .send(dtoWithOptional)
         .expect(201);
 
@@ -225,14 +162,14 @@ describe('Properties Management Flow (e2e)', () => {
   describe('GET /properties', () => {
     beforeEach(async () => {
       // Create test properties
-      await prisma.property.createMany({
+      await context.prisma.property.createMany({
         data: [
           {
             code: '001',
             name: 'Property 1',
             area: { value: 100, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Street 1',
             number: '1',
             neighborhood: 'Neighborhood 1',
@@ -245,7 +182,7 @@ describe('Properties Management Flow (e2e)', () => {
             name: 'Property 2',
             area: { value: 200, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Street 2',
             number: '2',
             neighborhood: 'Neighborhood 2',
@@ -258,7 +195,7 @@ describe('Properties Management Flow (e2e)', () => {
             name: 'Deleted Property',
             area: { value: 300, type: 'hectares' },
             status: 'active',
-            companyId: testCompany.id,
+            companyId: context.testCompany.id,
             street: 'Street 3',
             number: '3',
             neighborhood: 'Neighborhood 3',
@@ -272,9 +209,8 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should return all properties for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -285,9 +221,8 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted properties', async () => {
-      const response = await request(app.getHttpServer())
+      const response = authenticatedRequest(context.app, context.mainUserToken)
         .get('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
         .expect(200);
 
       const codes = response.body.map((p: any) => p.code);
@@ -296,7 +231,7 @@ describe('Properties Management Flow (e2e)', () => {
 
     it('should fail without view permission', async () => {
       // Update regular user to have no view permission
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { email: 'regular@testcompany.com' },
         data: {
           permissions: {
@@ -332,7 +267,7 @@ describe('Properties Management Flow (e2e)', () => {
           name: 'Test Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',
@@ -366,7 +301,7 @@ describe('Properties Management Flow (e2e)', () => {
 
     it('should return 404 for soft-deleted property', async () => {
       // Soft delete the property
-      await prisma.property.update({
+      await context.prisma.property.update({
         where: { id: propertyId },
         data: { deletedAt: new Date() },
       });
@@ -388,7 +323,7 @@ describe('Properties Management Flow (e2e)', () => {
           name: 'Test Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',
@@ -429,13 +364,13 @@ describe('Properties Management Flow (e2e)', () => {
 
     it('should fail with duplicate code', async () => {
       // Create another property
-      await prisma.property.create({
+      await context.prisma.property.create({
         data: {
           code: '002',
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Other Street',
           number: '456',
           neighborhood: 'Other Neighborhood',
@@ -464,7 +399,7 @@ describe('Properties Management Flow (e2e)', () => {
           name: 'Test Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',
@@ -537,7 +472,7 @@ describe('Properties Management Flow (e2e)', () => {
       otherCompany = otherTestData.company;
       otherUser = otherTestData.user;
 
-      await prisma.user.update({
+      await context.prisma.user.update({
         where: { id: otherUser.id },
         data: {
           status: 'active',
@@ -562,7 +497,7 @@ describe('Properties Management Flow (e2e)', () => {
           name: 'First Company Property',
           area: { value: 100, type: 'hectares' },
           status: 'active',
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           street: 'Test Street',
           number: '123',
           neighborhood: 'Test Neighborhood',

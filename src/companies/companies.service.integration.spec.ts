@@ -194,6 +194,13 @@ describeOrSkip('CompaniesService Integration Tests', () => {
 
   describe('registerCompany with real database', () => {
     it('should register a company successfully', async () => {
+      // Clean up any existing test company first
+      await prisma.company
+        .deleteMany({
+          where: { cnpj: '11.222.333/0001-55' },
+        })
+        .catch(() => {});
+
       const registerDto: RegisterCompanyDto = {
         cnpj: '11.222.333/0001-55',
         companyName: 'Test Company Integration',
@@ -245,6 +252,13 @@ describeOrSkip('CompaniesService Integration Tests', () => {
     });
 
     it('should fail with duplicate CNPJ', async () => {
+      // Clean up any existing test company first
+      await prisma.company
+        .deleteMany({
+          where: { cnpj: '11.222.333/0001-55' },
+        })
+        .catch(() => {});
+
       const registerDto1: RegisterCompanyDto = {
         cnpj: '11.222.333/0001-55',
         companyName: 'Test Company 1',
@@ -277,6 +291,13 @@ describeOrSkip('CompaniesService Integration Tests', () => {
     });
 
     it('should fail with duplicate company email', async () => {
+      // Clean up any existing test company first
+      await prisma.company
+        .deleteMany({
+          where: { cnpj: { in: ['11.222.333/0001-55', '22.333.444/0001-66'] } },
+        })
+        .catch(() => {});
+
       const registerDto1: RegisterCompanyDto = {
         cnpj: '11.222.333/0001-55',
         companyName: 'Test Company 1',
@@ -308,6 +329,13 @@ describeOrSkip('CompaniesService Integration Tests', () => {
     });
 
     it('should fail with duplicate user email', async () => {
+      // Clean up any existing test company first
+      await prisma.company
+        .deleteMany({
+          where: { cnpj: { in: ['11.222.333/0001-55', '22.333.444/0001-66'] } },
+        })
+        .catch(() => {});
+
       const registerDto1: RegisterCompanyDto = {
         cnpj: '11.222.333/0001-55',
         companyName: 'Test Company 1',
@@ -345,6 +373,13 @@ describeOrSkip('CompaniesService Integration Tests', () => {
     let testUser: any;
 
     beforeEach(async () => {
+      // Clean up any existing test company first
+      await prisma.company
+        .deleteMany({
+          where: { cnpj: '11.222.333/0001-55' },
+        })
+        .catch(() => {});
+
       testCompany = await prisma.company.create({
         data: {
           cnpj: '11.222.333/0001-55',
