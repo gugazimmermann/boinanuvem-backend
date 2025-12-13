@@ -6,9 +6,11 @@ import {
   E2ETestContext,
 } from './e2e-test-helpers';
 import { AccountsPayableStatus } from '../src/accounts-payable/dto';
+import { BankAccountType } from '../src/bank-accounts/dto';
 
 describe('Accounts Payable Management Flow (e2e)', () => {
   let context: E2ETestContext;
+  let testBankAccount: any;
 
   beforeAll(async () => {
     context = await setupE2ETest({
@@ -17,6 +19,19 @@ describe('Accounts Payable Management Flow (e2e)', () => {
       cnpj: '11.222.333/0001-09',
       planName: 'Avançado',
       isTrial: true,
+    });
+
+    // Create test bank account
+    testBankAccount = await context.prisma.bankAccount.create({
+      data: {
+        companyId: context.testCompany.id,
+        bankName: 'Test Bank',
+        bankCode: '001',
+        branch: '0001',
+        accountNumber: '12345-6',
+        accountType: BankAccountType.CHECKING,
+        status: 'active',
+      },
     });
   });
 
@@ -60,6 +75,46 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         .post('/accounts-payable')
         .send(createDto)
         .expect(401);
+    });
+
+    it('should create transaction with bankAccountId', async () => {
+      const createDto = {
+        amount: 1000.0,
+        dueDate: '2025-02-15',
+        description: 'Test payable with bank account',
+        category: 'feed',
+        paymentMethod: 'cash',
+        status: AccountsPayableStatus.UNPAID,
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/accounts-payable')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        amount: 1000.0,
+        status: AccountsPayableStatus.UNPAID,
+        bankAccountId: testBankAccount.id,
+      });
+    });
+
+    it('should return 404 if bank account not found when creating transaction', async () => {
+      const createDto = {
+        amount: 1000.0,
+        dueDate: '2025-02-15',
+        description: 'Test payable',
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await authenticatedRequest(context.app, context.mainUserToken)
+        .post('/accounts-payable')
+        .send(createDto)
+        .expect(404);
     });
   });
 
@@ -133,6 +188,52 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.status).toBe(AccountsPayableStatus.PAID);
+    });
+
+    it('should update transaction with bankAccountId', async () => {
+      const transaction = await context.prisma.accountsPayable.create({
+        data: {
+          amount: 1000.0,
+          dueDate: new Date('2025-02-15'),
+          description: 'Original transaction',
+          status: AccountsPayableStatus.UNPAID,
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await request(context.app.getHttpServer())
+        .put(`/accounts-payable/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should return 404 if bank account not found when updating transaction', async () => {
+      const transaction = await context.prisma.accountsPayable.create({
+        data: {
+          amount: 1000.0,
+          dueDate: new Date('2025-02-15'),
+          description: 'Original transaction',
+          status: AccountsPayableStatus.UNPAID,
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await request(context.app.getHttpServer())
+        .put(`/accounts-payable/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(404);
     });
   });
 

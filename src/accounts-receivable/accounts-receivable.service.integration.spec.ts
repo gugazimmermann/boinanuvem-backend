@@ -16,6 +16,7 @@ import {
 describeOrSkip('AccountsReceivableService Integration Tests', () => {
   let service: AccountsReceivableService;
   let context: IntegrationTestContext;
+  let testBankAccount: any;
 
   beforeAll(async () => {
     context = await setupIntegrationTest({
@@ -26,11 +27,24 @@ describeOrSkip('AccountsReceivableService Integration Tests', () => {
       createProperty: true,
       createBuyer: true,
     });
+
+    // Create a test bank account
+    testBankAccount = await context.prisma.bankAccount.create({
+      data: {
+        companyId: context.testCompany.id,
+        bankName: 'Test Bank',
+        bankCode: '001',
+        branch: '0001',
+        accountNumber: '12345-6',
+        accountType: 'checking',
+        status: 'active',
+      },
+    });
   });
 
   afterAll(async () => {
     await teardownIntegrationTest(context, {
-      tables: ['accountsReceivable', 'buyer'],
+      tables: ['accountsReceivable', 'bankAccount', 'buyer'],
     });
   });
 
@@ -82,6 +96,32 @@ describeOrSkip('AccountsReceivableService Integration Tests', () => {
       expect(result).toBeDefined();
       expect(result.propertyId).toBe(context.testProperty.id);
       expect(result.buyerId).toBe(context.testBuyer.id);
+    });
+
+    it('should create with bank account', async () => {
+      const createDto: CreateAccountsReceivableDto = {
+        amount: 10000.0,
+        dueDate: '2025-02-20',
+        description: 'Test receivable with bank account',
+        bankAccountId: testBankAccount.id,
+      };
+
+      const result = await service.create(context.testUser.id, createDto);
+
+      expect(result).toBeDefined();
+      expect(result.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should throw NotFoundException if bank account not found', async () => {
+      const createDto: CreateAccountsReceivableDto = {
+        amount: 5000.0,
+        dueDate: '2025-02-15',
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Bank account not found');
     });
   });
 
@@ -143,6 +183,42 @@ describeOrSkip('AccountsReceivableService Integration Tests', () => {
 
       expect(result.status).toBe(AccountsReceivableStatus.PAID);
       expect(result.paidAmount).toBe(5000.0);
+    });
+
+    it('should update transaction with bank account', async () => {
+      const created = await service.create(context.testUser.id, {
+        amount: 5000.0,
+        dueDate: '2025-02-15',
+        description: 'Original transaction',
+      });
+
+      const updateDto: UpdateAccountsReceivableDto = {
+        bankAccountId: testBankAccount.id,
+      };
+
+      const result = await service.update(
+        context.testUser.id,
+        created.id,
+        updateDto,
+      );
+
+      expect(result.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should throw NotFoundException if bank account not found on update', async () => {
+      const created = await service.create(context.testUser.id, {
+        amount: 5000.0,
+        dueDate: '2025-02-15',
+        description: 'Original transaction',
+      });
+
+      const updateDto: UpdateAccountsReceivableDto = {
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await expect(
+        service.update(context.testUser.id, created.id, updateDto),
+      ).rejects.toThrow('Bank account not found');
     });
   });
 

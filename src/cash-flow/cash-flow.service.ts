@@ -1,11 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../common/services/prisma.service';
+import { BaseServiceHelper } from '../common/services/base-service.helper';
 import { CreateCashFlowDto, UpdateCashFlowDto } from './dto';
 
 @Injectable()
-export class CashFlowService {
-  constructor(private prisma: PrismaService) {}
-
+export class CashFlowService extends BaseServiceHelper {
   async create(userId: string, createDto: CreateCashFlowDto) {
     const companyId = await this.getUserCompanyId(userId);
     await this.validateCreateDtoRelations(createDto, companyId);
@@ -20,6 +18,7 @@ export class CashFlowService {
         category: createDto.category ?? null,
         paymentMethod: createDto.paymentMethod ?? null,
         status: createDto.status ?? 'completed',
+        bankAccountId: createDto.bankAccountId ?? null,
         propertyId: createDto.propertyId ?? null,
         employeeId: createDto.employeeId ?? null,
         serviceProviderId: createDto.serviceProviderId ?? null,
@@ -63,6 +62,12 @@ export class CashFlowService {
     await this.findCashFlowByIdAndCompany(id, companyId);
 
     // Validate related entities if being updated
+    if (updateDto.bankAccountId) {
+      await this.validateBankAccountBelongsToCompany(
+        updateDto.bankAccountId,
+        companyId,
+      );
+    }
     if (updateDto.propertyId) {
       await this.validatePropertyBelongsToCompany(
         updateDto.propertyId,
@@ -111,19 +116,6 @@ export class CashFlowService {
     });
   }
 
-  private async getUserCompanyId(userId: string): Promise<string> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { companyId: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user.companyId;
-  }
-
   private async findCashFlowByIdAndCompany(id: string, companyId: string) {
     const cashFlow = await this.prisma.cashFlow.findFirst({
       where: {
@@ -140,107 +132,20 @@ export class CashFlowService {
     return cashFlow;
   }
 
-  private async validatePropertyBelongsToCompany(
-    propertyId: string,
-    companyId: string,
-  ) {
-    const property = await this.prisma.property.findFirst({
-      where: {
-        id: propertyId,
-        companyId,
-        deletedAt: null,
-      },
-    });
-
-    if (!property) {
-      throw new NotFoundException(
-        'Property not found or does not belong to your company',
-      );
-    }
-  }
-
-  private async validateEmployeeBelongsToCompany(
-    employeeId: string,
-    companyId: string,
-  ) {
-    const employee = await this.prisma.employee.findFirst({
-      where: {
-        id: employeeId,
-        companyId,
-        deletedAt: null,
-      },
-    });
-
-    if (!employee) {
-      throw new NotFoundException(
-        'Employee not found or does not belong to your company',
-      );
-    }
-  }
-
-  private async validateServiceProviderBelongsToCompany(
-    serviceProviderId: string,
-    companyId: string,
-  ) {
-    const serviceProvider = await this.prisma.serviceProvider.findFirst({
-      where: {
-        id: serviceProviderId,
-        companyId,
-        deletedAt: null,
-      },
-    });
-
-    if (!serviceProvider) {
-      throw new NotFoundException(
-        'Service provider not found or does not belong to your company',
-      );
-    }
-  }
-
-  private async validateSupplierBelongsToCompany(
-    supplierId: string,
-    companyId: string,
-  ) {
-    const supplier = await this.prisma.supplier.findFirst({
-      where: {
-        id: supplierId,
-        companyId,
-        deletedAt: null,
-      },
-    });
-
-    if (!supplier) {
-      throw new NotFoundException(
-        'Supplier not found or does not belong to your company',
-      );
-    }
-  }
-
-  private async validateBuyerBelongsToCompany(
-    buyerId: string,
-    companyId: string,
-  ) {
-    const buyer = await this.prisma.buyer.findFirst({
-      where: {
-        id: buyerId,
-        companyId,
-        deletedAt: null,
-      },
-    });
-
-    if (!buyer) {
-      throw new NotFoundException(
-        'Buyer not found or does not belong to your company',
-      );
-    }
-  }
-
   private async validateCreateDtoRelations(
     createDto: CreateCashFlowDto,
     companyId: string,
   ): Promise<void> {
     const validations: Promise<void>[] = [];
 
+    if (createDto.bankAccountId) {
+      validations.push(
+        this.validateBankAccountBelongsToCompany(
+          createDto.bankAccountId,
+          companyId,
+        ),
+      );
+    }
     if (createDto.propertyId) {
       validations.push(
         this.validatePropertyBelongsToCompany(createDto.propertyId, companyId),
@@ -305,6 +210,12 @@ export class CashFlowService {
       (val) => val ?? null,
     );
     this.setFieldIfDefined(data, 'status', updateDto.status);
+    this.setFieldIfDefined(
+      data,
+      'bankAccountId',
+      updateDto.bankAccountId,
+      (val) => val ?? null,
+    );
     this.setFieldIfDefined(
       data,
       'propertyId',

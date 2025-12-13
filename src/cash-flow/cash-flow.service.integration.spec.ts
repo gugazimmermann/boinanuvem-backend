@@ -22,6 +22,7 @@ describeOrSkip('CashFlowService Integration Tests', () => {
   let testServiceProvider: any;
   let testSupplier: any;
   let testBuyer: any;
+  let testBankAccount: any;
 
   beforeAll(async () => {
     context = await setupIntegrationTest({
@@ -39,11 +40,31 @@ describeOrSkip('CashFlowService Integration Tests', () => {
     testServiceProvider = context.testServiceProviders[0];
     testSupplier = context.testSupplier;
     testBuyer = context.testBuyer;
+
+    // Create a test bank account
+    testBankAccount = await context.prisma.bankAccount.create({
+      data: {
+        companyId: context.testCompany.id,
+        bankName: 'Test Bank',
+        bankCode: '001',
+        branch: '0001',
+        accountNumber: '12345-6',
+        accountType: 'checking',
+        status: 'active',
+      },
+    });
   });
 
   afterAll(async () => {
     await teardownIntegrationTest(context, {
-      tables: ['cashFlow', 'buyer', 'supplier', 'serviceProvider', 'employee'],
+      tables: [
+        'cashFlow',
+        'bankAccount',
+        'buyer',
+        'supplier',
+        'serviceProvider',
+        'employee',
+      ],
     });
   });
 
@@ -134,6 +155,34 @@ describeOrSkip('CashFlowService Integration Tests', () => {
         service.create(context.testUser.id, createDto),
       ).rejects.toThrow('not found');
     });
+
+    it('should create transaction with bank account', async () => {
+      const createDto: CreateCashFlowDto = {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        description: 'Test expense with bank account',
+        bankAccountId: testBankAccount.id,
+      };
+
+      const result = await service.create(context.testUser.id, createDto);
+
+      expect(result).toBeDefined();
+      expect(result.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should throw NotFoundException if bank account not found', async () => {
+      const createDto: CreateCashFlowDto = {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Bank account not found');
+    });
   });
 
   describe('findAll', () => {
@@ -202,6 +251,44 @@ describeOrSkip('CashFlowService Integration Tests', () => {
 
       expect(result.description).toBe('Updated description');
       expect(result.amount).toBe(1500.0);
+    });
+
+    it('should update transaction with bank account', async () => {
+      const created = await service.create(context.testUser.id, {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        description: 'Original transaction',
+      });
+
+      const updateDto: UpdateCashFlowDto = {
+        bankAccountId: testBankAccount.id,
+      };
+
+      const result = await service.update(
+        context.testUser.id,
+        created.id,
+        updateDto,
+      );
+
+      expect(result.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should throw NotFoundException if bank account not found on update', async () => {
+      const created = await service.create(context.testUser.id, {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        description: 'Original transaction',
+      });
+
+      const updateDto: UpdateCashFlowDto = {
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await expect(
+        service.update(context.testUser.id, created.id, updateDto),
+      ).rejects.toThrow('Bank account not found');
     });
   });
 

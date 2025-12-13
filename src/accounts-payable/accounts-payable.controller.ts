@@ -39,7 +39,7 @@ export class AccountsPayableController {
   @Post()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'accountsPayable',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -61,7 +61,7 @@ export class AccountsPayableController {
   @Get()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'accountsPayable',
     action: 'view',
   })
   @ApiOperation({
@@ -81,7 +81,7 @@ export class AccountsPayableController {
   @Get(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'accountsPayable',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get an accounts payable transaction by ID' })
@@ -102,7 +102,7 @@ export class AccountsPayableController {
   @Put(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'accountsPayable',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update an accounts payable transaction' })
@@ -128,7 +128,7 @@ export class AccountsPayableController {
   @Delete(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'accountsPayable',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

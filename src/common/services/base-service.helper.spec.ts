@@ -71,6 +71,13 @@ class TestServiceHelper extends BaseServiceHelper {
     return this.validateSupplierBelongsToCompany(supplierId, companyId);
   }
 
+  async testValidateBankAccountBelongsToCompany(
+    bankAccountId: string,
+    companyId: string,
+  ): Promise<void> {
+    return this.validateBankAccountBelongsToCompany(bankAccountId, companyId);
+  }
+
   async testFindEntityByIdAndCompany<T>(
     model: string,
     id: string,
@@ -121,6 +128,9 @@ describe('BaseServiceHelper', () => {
         findMany: jest.fn(),
       },
       supplier: {
+        findFirst: jest.fn(),
+      },
+      bankAccount: {
         findFirst: jest.fn(),
       },
       sale: {
@@ -336,6 +346,63 @@ describe('BaseServiceHelper', () => {
       await expect(
         service.testValidateSupplierBelongsToCompany('supplier-1', 'company-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('validateBankAccountBelongsToCompany', () => {
+    it('should not throw if bank account belongs to company', async () => {
+      prismaService.bankAccount.findFirst.mockResolvedValue({
+        id: 'bank-account-1',
+      });
+
+      await expect(
+        service.testValidateBankAccountBelongsToCompany(
+          'bank-account-1',
+          'company-1',
+        ),
+      ).resolves.not.toThrow();
+    });
+
+    it('should throw NotFoundException if bank account not found', async () => {
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.testValidateBankAccountBelongsToCompany(
+          'bank-account-1',
+          'company-1',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if bank account belongs to different company', async () => {
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.testValidateBankAccountBelongsToCompany(
+          'bank-account-1',
+          'company-1',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should check for deletedAt: null', async () => {
+      prismaService.bankAccount.findFirst.mockResolvedValue({
+        id: 'bank-account-1',
+      });
+
+      await service.testValidateBankAccountBelongsToCompany(
+        'bank-account-1',
+        'company-1',
+      );
+
+      expect(prismaService.bankAccount.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'bank-account-1',
+          companyId: 'company-1',
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
     });
   });
 

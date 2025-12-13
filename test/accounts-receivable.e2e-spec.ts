@@ -6,9 +6,11 @@ import {
   E2ETestContext,
 } from './e2e-test-helpers';
 import { AccountsReceivableStatus } from '../src/accounts-receivable/dto';
+import { BankAccountType } from '../src/bank-accounts/dto';
 
 describe('Accounts Receivable Management Flow (e2e)', () => {
   let context: E2ETestContext;
+  let testBankAccount: any;
 
   beforeAll(async () => {
     context = await setupE2ETest({
@@ -17,6 +19,19 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
       cnpj: '11.222.333/0001-11',
       planName: 'Avançado',
       isTrial: true,
+    });
+
+    // Create test bank account
+    testBankAccount = await context.prisma.bankAccount.create({
+      data: {
+        companyId: context.testCompany.id,
+        bankName: 'Test Bank',
+        bankCode: '001',
+        branch: '0001',
+        accountNumber: '12345-6',
+        accountType: BankAccountType.CHECKING,
+        status: 'active',
+      },
     });
   });
 
@@ -48,6 +63,46 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         status: AccountsReceivableStatus.UNPAID,
       });
       expect(response.body.id).toBeDefined();
+    });
+
+    it('should create transaction with bankAccountId', async () => {
+      const createDto = {
+        amount: 5000.0,
+        dueDate: '2025-02-15',
+        description: 'Test receivable with bank account',
+        category: 'cattle_sales',
+        paymentMethod: 'bank_transfer',
+        status: AccountsReceivableStatus.UNPAID,
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/accounts-receivable')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        amount: 5000.0,
+        status: AccountsReceivableStatus.UNPAID,
+        bankAccountId: testBankAccount.id,
+      });
+    });
+
+    it('should return 404 if bank account not found when creating transaction', async () => {
+      const createDto = {
+        amount: 5000.0,
+        dueDate: '2025-02-15',
+        description: 'Test receivable',
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await authenticatedRequest(context.app, context.mainUserToken)
+        .post('/accounts-receivable')
+        .send(createDto)
+        .expect(404);
     });
   });
 
@@ -121,6 +176,52 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.status).toBe(AccountsReceivableStatus.PAID);
+    });
+
+    it('should update transaction with bankAccountId', async () => {
+      const transaction = await context.prisma.accountsReceivable.create({
+        data: {
+          amount: 5000.0,
+          dueDate: new Date('2025-02-15'),
+          description: 'Original transaction',
+          status: AccountsReceivableStatus.UNPAID,
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await request(context.app.getHttpServer())
+        .put(`/accounts-receivable/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should return 404 if bank account not found when updating transaction', async () => {
+      const transaction = await context.prisma.accountsReceivable.create({
+        data: {
+          amount: 5000.0,
+          dueDate: new Date('2025-02-15'),
+          description: 'Original transaction',
+          status: AccountsReceivableStatus.UNPAID,
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await request(context.app.getHttpServer())
+        .put(`/accounts-receivable/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(404);
     });
   });
 

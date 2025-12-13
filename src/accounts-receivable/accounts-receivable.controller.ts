@@ -39,7 +39,7 @@ export class AccountsReceivableController {
   @Post()
   @RequirePermissions({
     section: 'finances',
-    resource: 'revenue',
+    resource: 'accountsReceivable',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -61,7 +61,7 @@ export class AccountsReceivableController {
   @Get()
   @RequirePermissions({
     section: 'finances',
-    resource: 'revenue',
+    resource: 'accountsReceivable',
     action: 'view',
   })
   @ApiOperation({
@@ -81,7 +81,7 @@ export class AccountsReceivableController {
   @Get(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'revenue',
+    resource: 'accountsReceivable',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get an accounts receivable transaction by ID' })
@@ -102,7 +102,7 @@ export class AccountsReceivableController {
   @Put(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'revenue',
+    resource: 'accountsReceivable',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update an accounts receivable transaction' })
@@ -128,7 +128,7 @@ export class AccountsReceivableController {
   @Delete(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'revenue',
+    resource: 'accountsReceivable',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

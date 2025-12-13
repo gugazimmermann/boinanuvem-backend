@@ -10,6 +10,14 @@ export class AccountsReceivableService extends BaseServiceHelper {
   async create(userId: string, createDto: CreateAccountsReceivableDto) {
     const companyId = await this.getUserCompanyId(userId);
 
+    // Validate bank account if provided
+    if (createDto.bankAccountId) {
+      await this.validateBankAccountBelongsToCompany(
+        createDto.bankAccountId,
+        companyId,
+      );
+    }
+
     // Validate property if provided
     if (createDto.propertyId) {
       await this.validatePropertyBelongsToCompany(
@@ -32,6 +40,7 @@ export class AccountsReceivableService extends BaseServiceHelper {
         category: createDto.category ?? null,
         paymentMethod: createDto.paymentMethod ?? null,
         status: createDto.status ?? 'unpaid',
+        bankAccountId: createDto.bankAccountId ?? null,
         propertyId: createDto.propertyId ?? null,
         buyerId: createDto.buyerId ?? null,
         paidDate: createDto.paidDate ? new Date(createDto.paidDate) : null,
@@ -75,6 +84,12 @@ export class AccountsReceivableService extends BaseServiceHelper {
     await this.findAccountsReceivableByIdAndCompany(id, companyId);
 
     // Validate related entities if being updated
+    if (updateDto.bankAccountId) {
+      await this.validateBankAccountBelongsToCompany(
+        updateDto.bankAccountId,
+        companyId,
+      );
+    }
     if (updateDto.propertyId) {
       await this.validatePropertyBelongsToCompany(
         updateDto.propertyId,
@@ -155,6 +170,12 @@ export class AccountsReceivableService extends BaseServiceHelper {
       (val) => val ?? null,
     );
     this.setFieldIfDefined(data, 'status', updateDto.status);
+    this.setFieldIfDefined(
+      data,
+      'bankAccountId',
+      updateDto.bankAccountId,
+      (val) => val ?? null,
+    );
     this.setFieldIfDefined(
       data,
       'propertyId',

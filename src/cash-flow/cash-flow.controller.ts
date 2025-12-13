@@ -39,7 +39,7 @@ export class CashFlowController {
   @Post()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'cashFlow',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -61,7 +61,7 @@ export class CashFlowController {
   @Get()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'cashFlow',
     action: 'view',
   })
   @ApiOperation({
@@ -80,7 +80,7 @@ export class CashFlowController {
   @Get(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'cashFlow',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get a cash flow transaction by ID' })
@@ -98,7 +98,7 @@ export class CashFlowController {
   @Put(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'cashFlow',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update a cash flow transaction' })
@@ -121,7 +121,7 @@ export class CashFlowController {
   @Delete(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'cashFlow',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

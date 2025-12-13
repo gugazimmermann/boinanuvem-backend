@@ -39,7 +39,7 @@ export class BankAccountsController {
   @Post()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'bankAccounts',
     action: 'add',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -61,7 +61,7 @@ export class BankAccountsController {
   @Get()
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'bankAccounts',
     action: 'view',
   })
   @ApiOperation({
@@ -80,7 +80,7 @@ export class BankAccountsController {
   @Get(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'bankAccounts',
     action: 'view',
   })
   @ApiOperation({ summary: 'Get a bank account by ID' })
@@ -98,7 +98,7 @@ export class BankAccountsController {
   @Put(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'bankAccounts',
     action: 'edit',
   })
   @ApiOperation({ summary: 'Update a bank account' })
@@ -121,7 +121,7 @@ export class BankAccountsController {
   @Delete(':id')
   @RequirePermissions({
     section: 'finances',
-    resource: 'expenses',
+    resource: 'bankAccounts',
     action: 'remove',
   })
   @HttpCode(HttpStatus.OK)

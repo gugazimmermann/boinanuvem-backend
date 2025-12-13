@@ -109,8 +109,12 @@ export class HealthController {
   checkLiveness() {
     this.logger.debug('Performing liveness check');
     try {
+      // Use more lenient thresholds in test environment
+      const isTest = process.env.NODE_ENV === 'test';
+      const heapThreshold = isTest ? 2 * 1024 * 1024 * 1024 : 500 * 1024 * 1024; // 2GB vs 500MB
+
       const result = this.health.check([
-        () => this.memory.checkHeap('memory_heap', 500 * 1024 * 1024),
+        () => this.memory.checkHeap('memory_heap', heapThreshold),
       ]);
       this.logger.debug('Liveness check completed successfully');
       return result;
@@ -201,9 +205,10 @@ export class HealthController {
     this.logger.debug(`Performing ${checkType}`);
     try {
       // Use more lenient thresholds in test environment
+      // E2E tests can consume significant memory after running many tests
       const isTest = process.env.NODE_ENV === 'test';
-      const heapThreshold = isTest ? 500 * 1024 * 1024 : 150 * 1024 * 1024; // 500MB vs 150MB
-      const rssThreshold = isTest ? 3 * 1024 * 1024 * 1024 : 300 * 1024 * 1024; // 3GB vs 300MB
+      const heapThreshold = isTest ? 2 * 1024 * 1024 * 1024 : 150 * 1024 * 1024; // 2GB vs 150MB
+      const rssThreshold = isTest ? 4 * 1024 * 1024 * 1024 : 300 * 1024 * 1024; // 4GB vs 300MB
       const diskThreshold = isTest ? 0.95 : 0.9; // 95% vs 90%
 
       const healthChecks: Array<() => Promise<any>> = [

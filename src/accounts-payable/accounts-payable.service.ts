@@ -17,6 +17,7 @@ export class AccountsPayableService extends BaseServiceHelper {
         category: createDto.category ?? null,
         paymentMethod: createDto.paymentMethod ?? null,
         status: createDto.status ?? 'unpaid',
+        bankAccountId: createDto.bankAccountId ?? null,
         propertyId: createDto.propertyId ?? null,
         supplierId: createDto.supplierId ?? null,
         employeeId: createDto.employeeId ?? null,
@@ -62,6 +63,12 @@ export class AccountsPayableService extends BaseServiceHelper {
     await this.findAccountsPayableByIdAndCompany(id, companyId);
 
     // Validate related entities if being updated
+    if (updateDto.bankAccountId) {
+      await this.validateBankAccountBelongsToCompany(
+        updateDto.bankAccountId,
+        companyId,
+      );
+    }
     if (updateDto.propertyId) {
       await this.validatePropertyBelongsToCompany(
         updateDto.propertyId,
@@ -132,6 +139,14 @@ export class AccountsPayableService extends BaseServiceHelper {
   ): Promise<void> {
     const validations: Promise<void>[] = [];
 
+    if (createDto.bankAccountId) {
+      validations.push(
+        this.validateBankAccountBelongsToCompany(
+          createDto.bankAccountId,
+          companyId,
+        ),
+      );
+    }
     if (createDto.propertyId) {
       validations.push(
         this.validatePropertyBelongsToCompany(createDto.propertyId, companyId),
@@ -190,6 +205,12 @@ export class AccountsPayableService extends BaseServiceHelper {
       (val) => val ?? null,
     );
     this.setFieldIfDefined(data, 'status', updateDto.status);
+    this.setFieldIfDefined(
+      data,
+      'bankAccountId',
+      updateDto.bankAccountId,
+      (val) => val ?? null,
+    );
     this.setFieldIfDefined(
       data,
       'propertyId',

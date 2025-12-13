@@ -10,9 +10,11 @@ import {
   CashFlowCategory,
   PaymentMethod,
 } from '../src/cash-flow/dto';
+import { BankAccountType } from '../src/bank-accounts/dto';
 
 describe('Cash Flow Management Flow (e2e)', () => {
   let context: E2ETestContext;
+  let testBankAccount: any;
 
   beforeAll(async () => {
     context = await setupE2ETest({
@@ -21,6 +23,19 @@ describe('Cash Flow Management Flow (e2e)', () => {
       cnpj: '11.222.333/0001-07',
       planName: 'Avançado',
       isTrial: true,
+    });
+
+    // Create test bank account
+    testBankAccount = await context.prisma.bankAccount.create({
+      data: {
+        companyId: context.testCompany.id,
+        bankName: 'Test Bank',
+        bankCode: '001',
+        branch: '0001',
+        accountNumber: '12345-6',
+        accountType: BankAccountType.CHECKING,
+        status: 'active',
+      },
     });
   });
 
@@ -89,6 +104,71 @@ describe('Cash Flow Management Flow (e2e)', () => {
         .post('/cash-flow')
         .send(createDto)
         .expect(401);
+    });
+
+    it('should create expense transaction with bankAccountId', async () => {
+      const createDto = {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        description: 'Test expense with bank account',
+        category: CashFlowCategory.FEED,
+        paymentMethod: PaymentMethod.CASH,
+        status: 'completed',
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/cash-flow')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        bankAccountId: testBankAccount.id,
+      });
+    });
+
+    it('should create income transaction with bankAccountId', async () => {
+      const createDto = {
+        type: CashFlowType.INCOME,
+        amount: 5000.0,
+        date: '2025-01-16',
+        description: 'Test income with bank account',
+        category: CashFlowCategory.CATTLE_SALES,
+        paymentMethod: PaymentMethod.BANK_TRANSFER,
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/cash-flow')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body.type).toBe(CashFlowType.INCOME);
+      expect(response.body.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should return 404 if bank account not found when creating transaction', async () => {
+      const createDto = {
+        type: CashFlowType.EXPENSE,
+        amount: 1000.0,
+        date: '2025-01-15',
+        description: 'Test expense',
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await authenticatedRequest(context.app, context.mainUserToken)
+        .post('/cash-flow')
+        .send(createDto)
+        .expect(404);
     });
   });
 
@@ -181,6 +261,52 @@ describe('Cash Flow Management Flow (e2e)', () => {
 
       expect(response.body.description).toBe('Updated description');
       expect(response.body.amount).toBe(1500.0);
+    });
+
+    it('should update transaction with bankAccountId', async () => {
+      const transaction = await context.prisma.cashFlow.create({
+        data: {
+          type: CashFlowType.EXPENSE,
+          amount: 1000.0,
+          date: new Date('2025-01-15'),
+          description: 'Original transaction',
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: testBankAccount.id,
+      };
+
+      const response = await request(context.app.getHttpServer())
+        .put(`/cash-flow/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body.bankAccountId).toBe(testBankAccount.id);
+    });
+
+    it('should return 404 if bank account not found when updating transaction', async () => {
+      const transaction = await context.prisma.cashFlow.create({
+        data: {
+          type: CashFlowType.EXPENSE,
+          amount: 1000.0,
+          date: new Date('2025-01-15'),
+          description: 'Original transaction',
+          companyId: context.testCompany.id,
+        },
+      });
+
+      const updateDto = {
+        bankAccountId: 'non-existent-bank-account-id',
+      };
+
+      await request(context.app.getHttpServer())
+        .put(`/cash-flow/${transaction.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(updateDto)
+        .expect(404);
     });
   });
 

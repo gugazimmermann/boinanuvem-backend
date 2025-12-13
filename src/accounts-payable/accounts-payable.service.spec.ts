@@ -26,6 +26,7 @@ describe('AccountsPayableService', () => {
     category: 'feed',
     paymentMethod: 'cash',
     status: AccountsPayableStatus.UNPAID,
+    bankAccountId: null,
     deletedAt: null,
     createdAt: new Date('2025-01-15'),
     updatedAt: new Date('2025-01-15'),
@@ -55,6 +56,9 @@ describe('AccountsPayableService', () => {
         findFirst: jest.fn(),
       },
       serviceProvider: {
+        findFirst: jest.fn(),
+      },
+      bankAccount: {
         findFirst: jest.fn(),
       },
       accountsPayable: {
@@ -109,6 +113,11 @@ describe('AccountsPayableService', () => {
         id: 'sp-1',
         companyId: 'company-1',
       };
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
 
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.property.findFirst.mockResolvedValue(mockProperty);
@@ -117,6 +126,7 @@ describe('AccountsPayableService', () => {
       prismaService.serviceProvider.findFirst.mockResolvedValue(
         mockServiceProvider,
       );
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
       prismaService.accountsPayable.create.mockResolvedValue(
         mockAccountsPayable,
       );
@@ -127,6 +137,7 @@ describe('AccountsPayableService', () => {
         supplierId: 'supplier-1',
         employeeId: 'employee-1',
         serviceProviderId: 'sp-1',
+        bankAccountId: 'bank-account-1',
         paidDate: '2025-01-20',
         paidAmount: 1000.0,
         referenceNumber: 'REF123',
@@ -136,6 +147,43 @@ describe('AccountsPayableService', () => {
       await service.create(mockUser.id, dtoWithAllFields);
 
       expect(prismaService.accountsPayable.create).toHaveBeenCalled();
+    });
+
+    it('should validate bank account if provided', async () => {
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
+
+      const dtoWithBankAccount = {
+        ...mockCreateAccountsPayableDto,
+        bankAccountId: 'bank-account-1',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
+      prismaService.accountsPayable.create.mockResolvedValue(
+        mockAccountsPayable,
+      );
+
+      await service.create(mockUser.id, dtoWithBankAccount);
+
+      expect(prismaService.bankAccount.findFirst).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if bank account not found', async () => {
+      const dtoWithBankAccount = {
+        ...mockCreateAccountsPayableDto,
+        bankAccountId: 'bank-account-1',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create(mockUser.id, dtoWithBankAccount),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -215,6 +263,11 @@ describe('AccountsPayableService', () => {
         id: 'sp-1',
         companyId: 'company-1',
       };
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
 
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.accountsPayable.findFirst.mockResolvedValue(
@@ -226,6 +279,7 @@ describe('AccountsPayableService', () => {
       prismaService.serviceProvider.findFirst.mockResolvedValue(
         mockServiceProvider,
       );
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
       prismaService.accountsPayable.update.mockResolvedValue(
         mockAccountsPayable,
       );
@@ -241,6 +295,7 @@ describe('AccountsPayableService', () => {
         supplierId: 'supplier-1',
         employeeId: 'employee-1',
         serviceProviderId: 'sp-1',
+        bankAccountId: 'bank-account-1',
         paidDate: '2025-01-20',
         paidAmount: 2000.0,
         referenceNumber: 'REF456',
@@ -250,6 +305,47 @@ describe('AccountsPayableService', () => {
       await service.update(mockUser.id, 'ap-1', updateDto);
 
       expect(prismaService.accountsPayable.update).toHaveBeenCalled();
+    });
+
+    it('should validate bank account on update if provided', async () => {
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.accountsPayable.findFirst.mockResolvedValue(
+        mockAccountsPayable,
+      );
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
+      prismaService.accountsPayable.update.mockResolvedValue(
+        mockAccountsPayable,
+      );
+
+      const updateDto: UpdateAccountsPayableDto = {
+        bankAccountId: 'bank-account-1',
+      };
+
+      await service.update(mockUser.id, 'ap-1', updateDto);
+
+      expect(prismaService.bankAccount.findFirst).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if bank account not found on update', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.accountsPayable.findFirst.mockResolvedValue(
+        mockAccountsPayable,
+      );
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      const updateDto: UpdateAccountsPayableDto = {
+        bankAccountId: 'bank-account-1',
+      };
+
+      await expect(
+        service.update(mockUser.id, 'ap-1', updateDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

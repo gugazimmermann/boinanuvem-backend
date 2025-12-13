@@ -29,6 +29,7 @@ describe('CashFlowService', () => {
     category: 'feed',
     paymentMethod: 'cash',
     status: 'completed',
+    bankAccountId: null,
     propertyId: 'property-1',
     deletedAt: null,
     createdAt: new Date('2025-01-15'),
@@ -63,6 +64,9 @@ describe('CashFlowService', () => {
         findFirst: jest.fn(),
       },
       buyer: {
+        findFirst: jest.fn(),
+      },
+      bankAccount: {
         findFirst: jest.fn(),
       },
       cashFlow: {
@@ -142,6 +146,7 @@ describe('CashFlowService', () => {
         category: null,
         paymentMethod: null,
         status: null,
+        bankAccountId: null,
         propertyId: null,
         employeeId: null,
         serviceProviderId: null,
@@ -316,6 +321,69 @@ describe('CashFlowService', () => {
         NotFoundException,
       );
     });
+
+    it('should validate bank account if provided', async () => {
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
+
+      const dtoWithBankAccount = {
+        ...mockCreateCashFlowDto,
+        bankAccountId: 'bank-account-1',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
+      prismaService.cashFlow.create.mockResolvedValue(mockCashFlow);
+
+      await service.create(mockUser.id, dtoWithBankAccount);
+
+      expect(prismaService.bankAccount.findFirst).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if bank account not found', async () => {
+      const dtoWithBankAccount = {
+        ...mockCreateCashFlowDto,
+        bankAccountId: 'bank-account-1',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create(mockUser.id, dtoWithBankAccount),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if bank account belongs to different company', async () => {
+      const dtoWithBankAccount = {
+        ...mockCreateCashFlowDto,
+        bankAccountId: 'bank-account-1',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create(mockUser.id, dtoWithBankAccount),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should create with bankAccountId set to null', async () => {
+      const dtoWithNullBankAccount: CreateCashFlowDto = {
+        ...mockCreateCashFlowDto,
+        bankAccountId: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.cashFlow.create.mockResolvedValue(mockCashFlow);
+
+      await service.create(mockUser.id, dtoWithNullBankAccount);
+
+      expect(prismaService.cashFlow.create).toHaveBeenCalled();
+    });
   });
 
   describe('findAll', () => {
@@ -379,6 +447,11 @@ describe('CashFlowService', () => {
     });
 
     it('should update with all optional fields', async () => {
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
       const mockEmployee = {
         id: 'employee-1',
         companyId: 'company-1',
@@ -402,6 +475,7 @@ describe('CashFlowService', () => {
 
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.cashFlow.findFirst.mockResolvedValue(mockCashFlow);
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
       prismaService.property.findFirst.mockResolvedValue(mockProperty);
       prismaService.employee.findFirst.mockResolvedValue(mockEmployee);
       prismaService.serviceProvider.findFirst.mockResolvedValue(
@@ -426,6 +500,7 @@ describe('CashFlowService', () => {
         buyerId: 'buyer-1',
         paymentDate: '2025-01-21',
         referenceNumber: 'REF123',
+        bankAccountId: 'bank-account-1',
         observation: 'Updated observation',
       };
 
@@ -450,6 +525,7 @@ describe('CashFlowService', () => {
         buyerId: null,
         paymentDate: null,
         referenceNumber: null,
+        bankAccountId: null,
         observation: null,
       };
 
@@ -485,6 +561,55 @@ describe('CashFlowService', () => {
       await expect(
         service.update(mockUser.id, 'cashflow-1', updateDto),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should validate bank account on update if provided', async () => {
+      const mockBankAccount = {
+        id: 'bank-account-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.cashFlow.findFirst.mockResolvedValue(mockCashFlow);
+      prismaService.bankAccount.findFirst.mockResolvedValue(mockBankAccount);
+      prismaService.cashFlow.update.mockResolvedValue(mockCashFlow);
+
+      const updateDto: UpdateCashFlowDto = {
+        bankAccountId: 'bank-account-1',
+      };
+
+      await service.update(mockUser.id, 'cashflow-1', updateDto);
+
+      expect(prismaService.bankAccount.findFirst).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if bank account not found on update', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.cashFlow.findFirst.mockResolvedValue(mockCashFlow);
+      prismaService.bankAccount.findFirst.mockResolvedValue(null);
+
+      const updateDto: UpdateCashFlowDto = {
+        bankAccountId: 'bank-account-1',
+      };
+
+      await expect(
+        service.update(mockUser.id, 'cashflow-1', updateDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update with bankAccountId set to null', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.cashFlow.findFirst.mockResolvedValue(mockCashFlow);
+      prismaService.cashFlow.update.mockResolvedValue(mockCashFlow);
+
+      const updateDto: UpdateCashFlowDto = {
+        bankAccountId: null,
+      };
+
+      await service.update(mockUser.id, 'cashflow-1', updateDto);
+
+      expect(prismaService.cashFlow.update).toHaveBeenCalled();
     });
   });
 
@@ -527,6 +652,7 @@ describe('CashFlowService', () => {
         description: null,
         category: null,
         paymentMethod: null,
+        bankAccountId: null,
         propertyId: null,
         employeeId: null,
         serviceProviderId: null,
@@ -543,6 +669,7 @@ describe('CashFlowService', () => {
       expect(result.description).toBeNull();
       expect(result.category).toBeNull();
       expect(result.paymentMethod).toBeNull();
+      expect(result.bankAccountId).toBeNull();
     });
   });
 });

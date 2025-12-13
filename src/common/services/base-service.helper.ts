@@ -211,6 +211,29 @@ export class BaseServiceHelper {
   }
 
   /**
+   * Validate that a bank account belongs to the company
+   */
+  async validateBankAccountBelongsToCompany(
+    bankAccountId: string,
+    companyId: string,
+  ): Promise<void> {
+    const bankAccount = await this.prisma.bankAccount.findFirst({
+      where: {
+        id: bankAccountId,
+        companyId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (!bankAccount) {
+      throw new NotFoundException(
+        'Bank account not found or does not belong to your company',
+      );
+    }
+  }
+
+  /**
    * Generic method to find an entity by ID and company with optional include
    * Note: Uses dynamic Prisma model access which requires type assertions
    */
