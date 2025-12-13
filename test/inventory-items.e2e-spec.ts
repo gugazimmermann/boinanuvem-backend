@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -46,7 +47,10 @@ describe('Inventory Items Management Flow (e2e)', () => {
         propertyIds: [context.testProperty.id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/inventory-items')
         .send(createDto)
         .expect(201);
@@ -74,7 +78,10 @@ describe('Inventory Items Management Flow (e2e)', () => {
         propertyIds: [context.testProperty.id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/inventory-items')
         .send(createDto)
         .expect(201);
@@ -173,7 +180,10 @@ describe('Inventory Items Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/inventory-items')
         .expect(200);
 
@@ -182,7 +192,15 @@ describe('Inventory Items Management Flow (e2e)', () => {
     });
 
     it('should return empty array when no items exist', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      // Clean up any existing inventory items for this test
+      await context.prisma.inventoryItem.deleteMany({
+        where: { companyId: context.testCompany.id },
+      });
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/inventory-items')
         .expect(200);
 
@@ -192,7 +210,7 @@ describe('Inventory Items Management Flow (e2e)', () => {
 
   describe('GET /inventory-items/:id', () => {
     it('should return inventory item by ID', async () => {
-      const item = await prisma.inventoryItem.create({
+      const item = await context.prisma.inventoryItem.create({
         data: {
           code: 'INV008',
           name: 'Test Item',
@@ -204,7 +222,10 @@ describe('Inventory Items Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/inventory-items/${item.id}`)
         .expect(200);
 
@@ -221,7 +242,7 @@ describe('Inventory Items Management Flow (e2e)', () => {
 
   describe('PUT /inventory-items/:id', () => {
     it('should update inventory item successfully', async () => {
-      const item = await prisma.inventoryItem.create({
+      const item = await context.prisma.inventoryItem.create({
         data: {
           code: 'INV009',
           name: 'Original Name',
@@ -238,7 +259,10 @@ describe('Inventory Items Management Flow (e2e)', () => {
         minimumStock: 20,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/inventory-items/${item.id}`)
         .send(updateDto)
         .expect(200);
@@ -271,7 +295,7 @@ describe('Inventory Items Management Flow (e2e)', () => {
         },
       });
 
-      const item = await prisma.inventoryItem.create({
+      const item = await context.prisma.inventoryItem.create({
         data: {
           code: 'INV011',
           name: 'Item to Update',
@@ -287,9 +311,9 @@ describe('Inventory Items Management Flow (e2e)', () => {
         code: 'INV010',
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/inventory-items/${item.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(409);
     });
@@ -297,7 +321,7 @@ describe('Inventory Items Management Flow (e2e)', () => {
 
   describe('DELETE /inventory-items/:id', () => {
     it('should soft delete inventory item successfully', async () => {
-      const item = await prisma.inventoryItem.create({
+      const item = await context.prisma.inventoryItem.create({
         data: {
           code: 'INV012',
           name: 'Test Item',

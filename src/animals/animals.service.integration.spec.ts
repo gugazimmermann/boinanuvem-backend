@@ -74,7 +74,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       expect(result.createdAt).toBeDefined();
 
       // Verify in database
-      const animal = await prisma.animal.findUnique({
+      const animal = await context.prisma.animal.findUnique({
         where: { id: result.id },
       });
       expect(animal).toBeDefined();
@@ -103,17 +103,17 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         propertyId: context.testProperty.id,
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Try to create duplicate
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Animal with this code already exists',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Animal with this code already exists');
     });
 
     it('should allow same code for different companies', async () => {
       // Create another company
-      const otherCompany = await prisma.company.create({
+      const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
@@ -131,7 +131,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Property',
@@ -147,7 +147,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      const otherUser = await prisma.user.create({
+      const otherUser = await context.prisma.user.create({
         data: {
           name: 'Other User',
           email: 'other-user@testcompany.com',
@@ -176,7 +176,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       };
 
       // Create in first company
-      await service.create(testUser.id, createDto1);
+      await service.create(context.testUser.id, createDto1);
 
       // Create with same code in second company (should succeed)
       const result = await service.create(otherUser.id, createDto2);
@@ -205,14 +205,14 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         propertyId: 'non-existent-property-id',
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property not found');
     });
 
     it('should fail if property belongs to different company', async () => {
       // Create another company
-      const otherCompany = await prisma.company.create({
+      const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '33.444.555/0001-77',
           companyName: 'Another Test Company',
@@ -230,7 +230,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Another Property',
@@ -253,9 +253,9 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         propertyId: otherProperty.id,
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property not found');
 
       // Cleanup
       await context.prisma.property.deleteMany({
@@ -297,7 +297,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         ],
       });
 
-      const result = await service.findAll(testUser.id);
+      const result = await service.findAll(context.testUser.id);
 
       expect(result.length).toBe(2); // Excludes soft-deleted
       expect(result.every((a) => a.deletedAt === undefined)).toBe(true);
@@ -315,7 +315,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      const result = await service.findAll(testUser.id);
+      const result = await service.findAll(context.testUser.id);
 
       expect(result.length).toBe(0);
     });
@@ -325,7 +325,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -338,7 +338,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     });
 
     it('should return an animal by id', async () => {
-      const result = await service.findOne(testUser.id, animalId);
+      const result = await service.findOne(context.testUser.id, animalId);
 
       expect(result).toMatchObject({
         id: animalId,
@@ -350,7 +350,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
 
     it('should fail for non-existent animal', async () => {
       await expect(
-        service.findOne(testUser.id, 'non-existent-id'),
+        service.findOne(context.testUser.id, 'non-existent-id'),
       ).rejects.toThrow('Animal not found');
     });
 
@@ -360,9 +360,9 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         data: { deletedAt: new Date() },
       });
 
-      await expect(service.findOne(testUser.id, animalId)).rejects.toThrow(
-        'Animal not found',
-      );
+      await expect(
+        service.findOne(context.testUser.id, animalId),
+      ).rejects.toThrow('Animal not found');
     });
   });
 
@@ -370,7 +370,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -388,7 +388,11 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         status: 'inactive',
       };
 
-      const result = await service.update(testUser.id, animalId, updateDto);
+      const result = await service.update(
+        context.testUser.id,
+        animalId,
+        updateDto,
+      );
 
       expect(result).toMatchObject({
         id: animalId,
@@ -402,7 +406,11 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         code: '001-UPDATED',
       };
 
-      const result = await service.update(testUser.id, animalId, updateDto);
+      const result = await service.update(
+        context.testUser.id,
+        animalId,
+        updateDto,
+      );
 
       expect(result.code).toBe('001-UPDATED');
     });
@@ -424,13 +432,13 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       };
 
       await expect(
-        service.update(testUser.id, animalId, updateDto),
+        service.update(context.testUser.id, animalId, updateDto),
       ).rejects.toThrow('Animal with this code already exists');
     });
 
     it('should allow updating propertyId to valid property', async () => {
       // Create another property
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '002',
           name: 'Other Property',
@@ -450,7 +458,11 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         propertyId: otherProperty.id,
       };
 
-      const result = await service.update(testUser.id, animalId, updateDto);
+      const result = await service.update(
+        context.testUser.id,
+        animalId,
+        updateDto,
+      );
 
       expect(result.propertyId).toBe(otherProperty.id);
     });
@@ -460,7 +472,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -473,26 +485,26 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     });
 
     it('should soft delete an animal', async () => {
-      const result = await service.remove(testUser.id, animalId);
+      const result = await service.remove(context.testUser.id, animalId);
 
       expect(result).toEqual({
         message: 'Animal deleted successfully',
       });
 
       // Verify soft delete
-      const deletedAnimal = await prisma.animal.findUnique({
+      const deletedAnimal = await context.prisma.animal.findUnique({
         where: { id: animalId },
       });
       expect(deletedAnimal?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResult = await service.findAll(testUser.id);
+      const listResult = await service.findAll(context.testUser.id);
       expect(listResult.find((a) => a.id === animalId)).toBeUndefined();
     });
 
     it('should fail for non-existent animal', async () => {
       await expect(
-        service.remove(testUser.id, 'non-existent-id'),
+        service.remove(context.testUser.id, 'non-existent-id'),
       ).rejects.toThrow('Animal not found');
     });
   });
@@ -521,7 +533,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         .catch(() => {});
 
       // Create another company
-      otherCompany = await prisma.company.create({
+      otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '99.888.777/0001-11',
           companyName: 'Isolation Test Company',
@@ -555,7 +567,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
         },
       });
 
-      otherUser = await prisma.user.create({
+      otherUser = await context.prisma.user.create({
         data: {
           name: 'Isolation User',
           email: 'isolation-user@testcompany.com',
@@ -570,7 +582,7 @@ describeOrSkip('AnimalsService Integration Tests', () => {
       });
 
       // Create animal for first company
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -583,18 +595,20 @@ describeOrSkip('AnimalsService Integration Tests', () => {
     });
 
     afterEach(async () => {
-      await context.prisma.animal.deleteMany({
-        where: { companyId: otherCompany.id },
-      });
-      await context.prisma.property.deleteMany({
-        where: { companyId: otherCompany.id },
-      });
-      await context.prisma.user.deleteMany({
-        where: { companyId: otherCompany.id },
-      });
-      await context.prisma.company.deleteMany({
-        where: { id: otherCompany.id },
-      });
+      if (otherCompany?.id) {
+        await context.prisma.animal.deleteMany({
+          where: { companyId: otherCompany.id },
+        });
+        await context.prisma.property.deleteMany({
+          where: { companyId: otherCompany.id },
+        });
+        await context.prisma.user.deleteMany({
+          where: { companyId: otherCompany.id },
+        });
+        await context.prisma.company.deleteMany({
+          where: { id: otherCompany.id },
+        });
+      }
     });
 
     it('should not allow access to other company animals', async () => {

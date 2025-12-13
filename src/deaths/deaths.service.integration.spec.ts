@@ -52,16 +52,13 @@ describeOrSkip('DeathsService Integration Tests', () => {
     testAnimals = await createTestAnimals(context.prisma, 2, {
       companyId: context.testCompany.id,
       propertyId: context.testProperty.id,
-      code: 'DEATH-001',
-      registrationNumber: 'BR-2020-DT0001',
     });
-    testAnimals[1] = await context.prisma.animal.create({
+    // Override the second animal with specific code
+    testAnimals[1] = await context.prisma.animal.update({
+      where: { id: testAnimals[1].id },
       data: {
         code: 'DEATH-002',
         registrationNumber: 'BR-2020-DT0002',
-        status: 'active',
-        companyId: context.testCompany.id,
-        propertyId: context.testProperty.id,
       },
     });
   });
@@ -123,7 +120,7 @@ describeOrSkip('DeathsService Integration Tests', () => {
         cause: 'Disease',
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Try to create another death for the same animal
       await expect(
@@ -149,7 +146,7 @@ describeOrSkip('DeathsService Integration Tests', () => {
         cause: 'New cause',
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Verify the death was restored, not created new
       const updatedDeath = await context.prisma.death.findUnique({
@@ -169,12 +166,12 @@ describeOrSkip('DeathsService Integration Tests', () => {
         cause: 'Disease',
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       const result = await service.findAll(context.testUser.id);
 
       expect(result.length).toBeGreaterThan(0);
-      expect(result[0].companyId).toBe(testCompany.id);
+      expect(result[0].companyId).toBe(context.testCompany.id);
     });
   });
 
@@ -190,7 +187,7 @@ describeOrSkip('DeathsService Integration Tests', () => {
       const result = await service.findOne(context.testUser.id, created.id);
 
       expect(result.id).toBe(created.id);
-      expect(result.companyId).toBe(testCompany.id);
+      expect(result.companyId).toBe(context.testCompany.id);
     });
   });
 

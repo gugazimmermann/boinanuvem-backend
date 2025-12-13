@@ -118,7 +118,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       expect(result.acquisitionItems.length).toBe(2);
 
       // Verify animals were created
-      const animals = await prisma.animal.findMany({
+      const animals = await context.prisma.animal.findMany({
         where: {
           code: { in: ['001', '002'] },
           companyId: context.testCompany.id,
@@ -209,23 +209,23 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
 
     it('should create acquisition with existing animals', async () => {
       // Create existing animals
-      const animal1 = await prisma.animal.create({
+      const animal1 = await context.prisma.animal.create({
         data: {
           code: 'EXISTING-001',
           registrationNumber: 'BR-2019-EX0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
-      const animal2 = await prisma.animal.create({
+      const animal2 = await context.prisma.animal.create({
         data: {
           code: 'EXISTING-002',
           registrationNumber: 'BR-2019-EX0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -273,7 +273,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -294,15 +294,15 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Animal with code 001 already exists',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Animal with code 001 already exists');
     });
 
     it('should fail if property does not exist', async () => {
       const createDto: CreateAcquisitionDto = {
         propertyId: 'non-existent-property-id',
-        supplierId: testSupplier.id,
+        supplierId: context.testSupplier.id,
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
         paymentMethod: 'cash_flow',
@@ -317,14 +317,14 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property not found');
     });
 
     it('should fail if supplier does not exist', async () => {
       const createDto: CreateAcquisitionDto = {
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: 'non-existent-supplier-id',
         acquisitionDate: '2020-01-15',
         pricingMode: PricingMode.INDIVIDUAL,
@@ -340,9 +340,9 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
         ],
       };
 
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Supplier not found',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Supplier not found');
     });
   });
 
@@ -351,11 +351,11 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
-          supplierId: testSupplier.id,
+          propertyId: context.testProperty.id,
+          supplierId: context.testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: PricingMode.INDIVIDUAL,
           paymentMethod: 'cash_flow',
@@ -364,13 +364,13 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -393,7 +393,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       };
 
       const result = await service.update(
-        testUser.id,
+        context.testUser.id,
         acquisitionId,
         updateDto,
       );
@@ -406,13 +406,13 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     });
 
     it('should update acquisition items', async () => {
-      const newAnimal = await prisma.animal.create({
+      const newAnimal = await context.prisma.animal.create({
         data: {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -433,7 +433,7 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       };
 
       const result = await service.update(
-        testUser.id,
+        context.testUser.id,
         acquisitionId,
         updateDto,
       );
@@ -448,11 +448,11 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
-          supplierId: testSupplier.id,
+          propertyId: context.testProperty.id,
+          supplierId: context.testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: PricingMode.INDIVIDUAL,
           paymentMethod: 'cash_flow',
@@ -461,13 +461,13 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -483,7 +483,10 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     });
 
     it('should return acquisition by animal id', async () => {
-      const result = await service.findByAnimalId(testUser.id, animalId);
+      const result = await service.findByAnimalId(
+        context.testUser.id,
+        animalId,
+      );
 
       expect(result).toMatchObject({
         id: acquisitionId,
@@ -493,18 +496,21 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     });
 
     it('should fail for animal without acquisition record', async () => {
-      const animalWithoutAcquisition = await prisma.animal.create({
+      const animalWithoutAcquisition = await context.prisma.animal.create({
         data: {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
       await expect(
-        service.findByAnimalId(testUser.id, animalWithoutAcquisition.id),
+        service.findByAnimalId(
+          context.testUser.id,
+          animalWithoutAcquisition.id,
+        ),
       ).rejects.toThrow('Acquisition record not found');
     });
   });
@@ -513,11 +519,11 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     let acquisitionId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
-          supplierId: testSupplier.id,
+          propertyId: context.testProperty.id,
+          supplierId: context.testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: PricingMode.INDIVIDUAL,
           paymentMethod: 'cash_flow',
@@ -526,13 +532,13 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -548,20 +554,20 @@ describeOrSkip('AcquisitionsService Integration Tests', () => {
     });
 
     it('should soft delete an acquisition', async () => {
-      const result = await service.remove(testUser.id, acquisitionId);
+      const result = await service.remove(context.testUser.id, acquisitionId);
 
       expect(result).toEqual({
         message: 'Acquisition record deleted successfully',
       });
 
       // Verify soft delete
-      const deletedAcquisition = await prisma.acquisition.findUnique({
+      const deletedAcquisition = await context.prisma.acquisition.findUnique({
         where: { id: acquisitionId },
       });
       expect(deletedAcquisition?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResult = await service.findAll(testUser.id);
+      const listResult = await service.findAll(context.testUser.id);
       expect(listResult.find((a) => a.id === acquisitionId)).toBeUndefined();
     });
   });

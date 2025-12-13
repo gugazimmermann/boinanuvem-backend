@@ -60,7 +60,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         observation: 'Test control',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/sanitary-controls')
         .send(createDto)
         .expect(201);
@@ -82,7 +85,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         serviceProviderIds: [context.testServiceProviders[0].id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/sanitary-controls')
         .send(createDto)
         .expect(201);
@@ -118,7 +124,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/sanitary-controls')
         .expect(200);
 
@@ -129,7 +138,7 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
   describe('GET /sanitary-controls/:id', () => {
     it('should return sanitary control record by ID', async () => {
-      const control = await prisma.sanitaryControl.create({
+      const control = await context.prisma.sanitaryControl.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),
@@ -138,7 +147,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/sanitary-controls/${control.id}`)
         .expect(200);
 
@@ -157,7 +169,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/sanitary-controls/animal/${testAnimal.id}`)
         .expect(200);
 
@@ -170,7 +185,7 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
   describe('PUT /sanitary-controls/:id', () => {
     it('should update sanitary control record successfully', async () => {
-      const control = await prisma.sanitaryControl.create({
+      const control = await context.prisma.sanitaryControl.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),
@@ -185,7 +200,10 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         quantity: 20,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/sanitary-controls/${control.id}`)
         .send(updateDto)
         .expect(200);
@@ -197,7 +215,7 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
   describe('DELETE /sanitary-controls/:id', () => {
     it('should soft delete sanitary control record successfully', async () => {
-      const control = await prisma.sanitaryControl.create({
+      const control = await context.prisma.sanitaryControl.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),

@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -55,7 +56,10 @@ describe('Breedings Management Flow (e2e)', () => {
         observation: 'Test natural breeding',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/breedings')
         .send(createDto)
         .expect(201);
@@ -79,7 +83,10 @@ describe('Breedings Management Flow (e2e)', () => {
         observation: 'Test AI breeding',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/breedings')
         .send(createDto)
         .expect(201);
@@ -101,7 +108,10 @@ describe('Breedings Management Flow (e2e)', () => {
         serviceProviderIds: [context.testServiceProviders[0].id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/breedings')
         .send(createDto)
         .expect(201);
@@ -154,7 +164,7 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      await prisma.breeding.create({
+      await context.prisma.breeding.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-16'),
@@ -165,7 +175,10 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/breedings')
         .expect(200);
 
@@ -174,7 +187,15 @@ describe('Breedings Management Flow (e2e)', () => {
     });
 
     it('should return empty array when no breedings exist', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      // Clean up any existing breedings for this test
+      await context.prisma.breeding.deleteMany({
+        where: { companyId: context.testCompany.id },
+      });
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/breedings')
         .expect(200);
 
@@ -194,7 +215,10 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/breedings/${breeding.id}`)
         .expect(200);
 
@@ -211,7 +235,7 @@ describe('Breedings Management Flow (e2e)', () => {
 
   describe('GET /breedings/animal/:animalId', () => {
     it('should return breedings for animal', async () => {
-      await prisma.breeding.create({
+      await context.prisma.breeding.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),
@@ -221,7 +245,7 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      await prisma.breeding.create({
+      await context.prisma.breeding.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-20'),
@@ -231,7 +255,10 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/breedings/animal/${testAnimal.id}`)
         .expect(200);
 
@@ -266,7 +293,10 @@ describe('Breedings Management Flow (e2e)', () => {
         observation: 'Updated observation',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/breedings/${breeding.id}`)
         .send(updateDto)
         .expect(200);
@@ -299,7 +329,10 @@ describe('Breedings Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/breedings/${breeding.id}/confirm`)
         .expect(200);
 

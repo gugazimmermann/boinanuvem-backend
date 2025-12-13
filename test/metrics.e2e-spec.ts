@@ -49,21 +49,23 @@ describe('Metrics Endpoint (e2e)', () => {
 
       const metricsText = response.text;
 
-      // Check for common process metrics
-      expect(metricsText).toMatch(/process_cpu/);
-      expect(metricsText).toMatch(/process_start_time/);
-      expect(metricsText).toMatch(/process_resident_memory/);
+      // In test environment, default metrics are disabled to prevent interval leaks
+      // So we only check for custom application metrics
+      expect(metricsText).toContain('boinanuvem_http_requests_total');
+      expect(metricsText).toContain('boinanuvem_http_request_duration_seconds');
+      expect(metricsText).toContain('boinanuvem_app_info');
     });
 
-    it('should include Node.js heap metrics', async () => {
+    it('should include application metrics', async () => {
       const response = await request(app.getHttpServer())
         .get('/metrics')
         .expect(200);
 
       const metricsText = response.text;
 
-      // Check for Node.js heap metrics
-      expect(metricsText).toMatch(/nodejs_heap_size/);
+      // Check for custom application metrics (default metrics disabled in test)
+      expect(metricsText).toContain('boinanuvem_http_requests_total');
+      expect(metricsText).toContain('boinanuvem_http_request_duration_seconds');
     });
 
     it('should return metrics without authentication', async () => {

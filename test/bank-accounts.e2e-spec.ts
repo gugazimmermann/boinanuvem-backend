@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -35,7 +36,10 @@ describe('Bank Accounts Management Flow (e2e)', () => {
         status: 'active',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/bank-accounts')
         .send(createDto)
         .expect(201);
@@ -88,7 +92,10 @@ describe('Bank Accounts Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/bank-accounts')
         .expect(200);
 
@@ -110,9 +117,9 @@ describe('Bank Accounts Management Flow (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/bank-accounts/${account.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body.id).toBe(account.id);
@@ -137,9 +144,9 @@ describe('Bank Accounts Management Flow (e2e)', () => {
         accountHolderName: 'Updated Name',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/bank-accounts/${account.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -160,12 +167,12 @@ describe('Bank Accounts Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/bank-accounts/${account.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
-      const deletedAccount = await prisma.bankAccount.findUnique({
+      const deletedAccount = await context.prisma.bankAccount.findUnique({
         where: { id: account.id },
       });
       expect(deletedAccount?.deletedAt).toBeDefined();

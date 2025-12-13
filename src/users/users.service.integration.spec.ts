@@ -207,13 +207,13 @@ describeOrSkip('UsersService Integration Tests', () => {
   describe('updatePermissions with real database', () => {
     beforeEach(async () => {
       const hashedPassword = await require('bcrypt').hash('password123', 10);
-      testUser = await prisma.user.create({
+      testUser = await context.prisma.user.create({
         data: {
           name: 'Test User',
           email: 'test-user-permissions@testcompany.com',
           phone: '(47) 99999-7777',
           password: hashedPassword,
-          companyId: testCompany.id,
+          companyId: context.testCompany.id,
           mainUser: false,
           status: 'active',
           emailVerifiedAt: new Date(),

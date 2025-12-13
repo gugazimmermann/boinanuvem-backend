@@ -1,9 +1,12 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
 import { createTestSupplier } from './test-data-factories';
+import { createTestCompany } from './test-utils';
 
 describe('Acquisitions Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -27,7 +30,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
     // Create a regular user with limited permissions
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    const regularUser = await prisma.user.create({
+    const regularUser = await context.prisma.user.create({
       data: {
         name: 'Regular User',
         email: 'regular@testcompany.com',
@@ -50,7 +53,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -58,12 +61,11 @@ describe('Acquisitions Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /acquisitions', () => {
@@ -97,7 +99,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         supplierId: testSupplier.id,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/acquisitions')
         .send(dto)
         .expect(201);
@@ -116,7 +121,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
       expect(response.body.acquisitionItems.length).toBe(2);
 
       // Verify animals were created
-      const animals = await prisma.animal.findMany({
+      const animals = await context.prisma.animal.findMany({
         where: {
           code: { in: ['001', '002'] },
           companyId: context.testCompany.id,
@@ -148,7 +153,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/acquisitions')
         .send(dto)
         .expect(201);
@@ -184,7 +192,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/acquisitions')
         .send(dto)
         .expect(201);
@@ -196,23 +207,23 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
     it('should create acquisition with existing animals', async () => {
       // Create existing animals
-      const animal1 = await prisma.animal.create({
+      const animal1 = await context.prisma.animal.create({
         data: {
           code: 'EXISTING-001',
           registrationNumber: 'BR-2019-EX0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
-      const animal2 = await prisma.animal.create({
+      const animal2 = await context.prisma.animal.create({
         data: {
           code: 'EXISTING-002',
           registrationNumber: 'BR-2019-EX0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -234,7 +245,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/acquisitions')
         .send(dto)
         .expect(201);
@@ -267,7 +281,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/acquisitions')
         .send(dto)
         .expect(201);
@@ -282,9 +299,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         propertyId: context.testProperty.id,
         supplierId: testSupplier.id,
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
         .expect(403);
     });
@@ -295,9 +312,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         propertyId: 'non-existent-property-id',
         supplierId: testSupplier.id,
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
@@ -305,17 +322,25 @@ describe('Acquisitions Management Flow (e2e)', () => {
     it('should fail if supplier does not exist', async () => {
       const dto = {
         ...createAcquisitionDto,
-        propertyId: testProperty.id,
+        propertyId: context.testProperty.id,
         supplierId: 'non-existent-supplier-id',
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
 
     it('should fail with duplicate animal code', async () => {
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       // Create animal with code 001
       await context.prisma.animal.create({
         data: {
@@ -323,7 +348,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -341,28 +366,28 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(409);
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
-        .send({ propertyId: testProperty.id }) // Missing required fields
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send({ propertyId: context.testProperty.id }) // Missing required fields
         .expect(400);
     });
 
     it('should validate pricing mode enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createAcquisitionDto,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           pricingMode: 'invalid_mode',
         })
@@ -370,12 +395,12 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should validate at least one acquisition item', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createAcquisitionDto,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionItems: [],
         })
@@ -385,13 +410,25 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
   describe('GET /acquisitions', () => {
     let acquisitionId2: string;
+    let animalIds: string[] = [];
 
     beforeEach(async () => {
+      // Clean up any existing acquisitions and animals first
+      await context.prisma.acquisition.deleteMany({
+        where: { companyId: context.testCompany.id },
+      });
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['001', '002'] },
+        },
+      });
+
       // Create test acquisitions
-      const acquisition1 = await prisma.acquisition.create({
+      const acquisition1 = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -400,15 +437,16 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      const animal1 = await prisma.animal.create({
+      const animal1 = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
+      animalIds.push(animal1.id);
 
       await context.prisma.acquisitionItem.create({
         data: {
@@ -420,10 +458,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      const acquisition2 = await prisma.acquisition.create({
+      const acquisition2 = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-02-20'),
           pricingMode: 'total',
@@ -435,8 +473,20 @@ describe('Acquisitions Management Flow (e2e)', () => {
       acquisitionId2 = acquisition2.id;
     });
 
+    afterEach(async () => {
+      if (animalIds.length > 0) {
+        await context.prisma.animal.deleteMany({
+          where: { id: { in: animalIds } },
+        });
+        animalIds = [];
+      }
+    });
+
     it('should return all acquisitions for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/acquisitions')
         .expect(200);
 
@@ -448,7 +498,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted acquisitions', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/acquisitions')
         .expect(200);
 
@@ -474,7 +527,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -482,7 +535,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/acquisitions')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -491,12 +544,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
   describe('GET /acquisitions/:id', () => {
     let acquisitionId: string;
+    let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -506,13 +568,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -525,12 +587,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
           costPerArroba: 500.0,
         },
       });
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should return an acquisition by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -546,9 +617,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should return 404 for non-existent acquisition', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/acquisitions/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -559,9 +630,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -571,10 +642,18 @@ describe('Acquisitions Management Flow (e2e)', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -584,13 +663,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -604,12 +683,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
           costPerArroba: 500.0,
         },
       });
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should return an acquisition by animal id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/acquisitions/animal/${animalId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -620,25 +708,25 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should return 404 for animal without acquisition record', async () => {
-      const animalWithoutAcquisition = await prisma.animal.create({
+      const animalWithoutAcquisition = await context.prisma.animal.create({
         data: {
           code: '002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/acquisitions/animal/${animalWithoutAcquisition.id}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
     it('should return 404 for animal from different company', async () => {
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -646,7 +734,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -662,7 +750,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      const otherAnimal = await prisma.animal.create({
+      const otherAnimal = await context.prisma.animal.create({
         data: {
           code: 'OTHER-001',
           registrationNumber: 'BR-2020-OTHER',
@@ -672,9 +760,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/acquisitions/animal/${otherAnimal.id}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -684,10 +772,18 @@ describe('Acquisitions Management Flow (e2e)', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -697,13 +793,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
       animalId = animal.id;
@@ -717,6 +813,15 @@ describe('Acquisitions Management Flow (e2e)', () => {
           costPerArroba: 500.0,
         },
       });
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should update an acquisition', async () => {
@@ -725,9 +830,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         observation: 'Updated observation',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -739,13 +844,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should update acquisition items', async () => {
-      const newAnimal = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'ACQ-UPDATE-002',
+        },
+      });
+
+      const newAnimal = await context.prisma.animal.create({
         data: {
-          code: '002',
+          code: 'ACQ-UPDATE-002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -765,9 +878,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         ],
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -776,16 +889,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ totalPrice: 12000.0 })
         .expect(403);
     });
 
     it('should fail if property does not belong to company', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -793,7 +911,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -813,9 +931,9 @@ describe('Acquisitions Management Flow (e2e)', () => {
         propertyId: otherProperty.id,
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(404);
     });
@@ -823,12 +941,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
 
   describe('DELETE /acquisitions/:id', () => {
     let acquisitionId: string;
+    let animalId: string;
 
     beforeEach(async () => {
-      const acquisition = await prisma.acquisition.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -838,13 +965,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
       });
       acquisitionId = acquisition.id;
 
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
         },
       });
 
@@ -857,12 +984,21 @@ describe('Acquisitions Management Flow (e2e)', () => {
           costPerArroba: 500.0,
         },
       });
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should soft delete an acquisition', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -870,15 +1006,15 @@ describe('Acquisitions Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedAcquisition = await prisma.acquisition.findUnique({
+      const deletedAcquisition = await context.prisma.acquisition.findUnique({
         where: { id: acquisitionId },
       });
       expect(deletedAcquisition?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/acquisitions')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -887,16 +1023,16 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/acquisitions/${acquisitionId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent acquisition', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/acquisitions/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -907,8 +1043,13 @@ describe('Acquisitions Management Flow (e2e)', () => {
     let acquisitionId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -926,7 +1067,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -937,10 +1078,10 @@ describe('Acquisitions Management Flow (e2e)', () => {
       otherToken = loginResponse.body.access_token;
 
       // Create acquisition for first company
-      const acquisition = await prisma.acquisition.create({
+      const acquisition = await context.prisma.acquisition.create({
         data: {
           companyId: context.testCompany.id,
-          propertyId: testProperty.id,
+          propertyId: context.testProperty.id,
           supplierId: testSupplier.id,
           acquisitionDate: new Date('2020-01-15'),
           pricingMode: 'individual',
@@ -952,14 +1093,14 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company acquisitions', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/acquisitions/${acquisitionId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company acquisitions', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/acquisitions/${acquisitionId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ totalPrice: 20000.0 })
@@ -967,7 +1108,7 @@ describe('Acquisitions Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company acquisitions', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/acquisitions/${acquisitionId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);

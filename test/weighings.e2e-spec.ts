@@ -72,7 +72,10 @@ describe('Weighings Management Flow (e2e)', () => {
         serviceProviderIds: context.testServiceProviders.map((sp) => sp.id),
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/weighings')
         .send(dto)
         .expect(201);
@@ -99,7 +102,10 @@ describe('Weighings Management Flow (e2e)', () => {
         serviceProviderIds: undefined,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/weighings')
         .send(dto)
         .expect(201);
@@ -114,7 +120,7 @@ describe('Weighings Management Flow (e2e)', () => {
         employeeIds: context.testEmployees.map((e) => e.id),
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/weighings')
         .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
@@ -128,7 +134,7 @@ describe('Weighings Management Flow (e2e)', () => {
         employeeIds: context.testEmployees.map((e) => e.id),
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/weighings')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
@@ -142,7 +148,7 @@ describe('Weighings Management Flow (e2e)', () => {
         employeeIds: ['non-existent-employee'],
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/weighings')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
@@ -150,7 +156,7 @@ describe('Weighings Management Flow (e2e)', () => {
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/weighings')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ animalId: testAnimal.id })
@@ -160,8 +166,14 @@ describe('Weighings Management Flow (e2e)', () => {
 
   describe('GET /weighings', () => {
     let weighingId: string;
+    let weighingIds: string[] = [];
 
     beforeEach(async () => {
+      // Clean up any existing weighings first
+      await context.prisma.weighing.deleteMany({
+        where: { companyId: context.testCompany.id },
+      });
+
       const weighing = await context.prisma.weighing.create({
         data: {
           animalId: testAnimal.id,
@@ -174,7 +186,7 @@ describe('Weighings Management Flow (e2e)', () => {
       });
       weighingId = weighing.id;
 
-      await context.prisma.weighing.create({
+      const weighing2 = await context.prisma.weighing.create({
         data: {
           animalId: testAnimal.id,
           weighingDate: new Date('2020-02-20'),
@@ -185,10 +197,20 @@ describe('Weighings Management Flow (e2e)', () => {
           deletedAt: new Date(),
         },
       });
+      weighingIds = [weighing.id, weighing2.id];
+    });
+
+    afterEach(async () => {
+      if (weighingIds.length > 0) {
+        await context.prisma.weighing.deleteMany({
+          where: { id: { in: weighingIds } },
+        });
+        weighingIds = [];
+      }
     });
 
     it('should return all weighings for company', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get('/weighings')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
@@ -200,7 +222,7 @@ describe('Weighings Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted weighings', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get('/weighings')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
@@ -259,18 +281,18 @@ describe('Weighings Management Flow (e2e)', () => {
     });
 
     it('should return weighing by ID', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/weighings/${weighingId}`)
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body.id).toBe(weighingId);
-      expect(response.body.companyId).toBe(testCompany.id);
+      expect(response.body.companyId).toBe(context.testCompany.id);
       expect(Array.isArray(response.body.employeeIds)).toBe(true);
     });
 
     it('should fail if weighing not found', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/weighings/non-existent-id')
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
@@ -279,6 +301,14 @@ describe('Weighings Management Flow (e2e)', () => {
 
   describe('GET /weighings/animal/:animalId', () => {
     it('should return weighings for animal', async () => {
+      // Clean up any existing weighings for this animal to ensure clean state
+      await context.prisma.weighing.deleteMany({
+        where: {
+          animalId: testAnimal.id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       await context.prisma.weighing.create({
         data: {
           animalId: testAnimal.id,
@@ -301,7 +331,7 @@ describe('Weighings Management Flow (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/weighings/animal/${testAnimal.id}`)
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
@@ -337,7 +367,7 @@ describe('Weighings Management Flow (e2e)', () => {
         observation: 'Updated observation',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/weighings/${weighingId}`)
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
@@ -352,7 +382,7 @@ describe('Weighings Management Flow (e2e)', () => {
         weight: 400.0,
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/weighings/${weighingId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .send(updateDto)
@@ -378,7 +408,7 @@ describe('Weighings Management Flow (e2e)', () => {
     });
 
     it('should soft delete weighing', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/weighings/${weighingId}`)
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
@@ -390,7 +420,7 @@ describe('Weighings Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/weighings/${weighingId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);

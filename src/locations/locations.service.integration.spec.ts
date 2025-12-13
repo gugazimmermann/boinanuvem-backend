@@ -94,7 +94,7 @@ describeOrSkip('LocationsService Integration Tests', () => {
         propertyId: context.testProperty.id,
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Try to create duplicate
       await expect(
@@ -135,10 +135,10 @@ describeOrSkip('LocationsService Integration Tests', () => {
       };
 
       // Create in first property
-      await service.create(testUser.id, createDto1);
+      await service.create(context.testUser.id, createDto1);
 
       // Create with same code in second property (should succeed)
-      const result = await service.create(testUser.id, createDto2);
+      const result = await service.create(context.testUser.id, createDto2);
       expect(result.code).toBe('DUPLICATE-001');
     });
 

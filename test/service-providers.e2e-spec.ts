@@ -1,8 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('Service Providers Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -45,7 +48,7 @@ describe('Service Providers Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -53,12 +56,11 @@ describe('Service Providers Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /service-providers', () => {
@@ -72,9 +74,12 @@ describe('Service Providers Management Flow (e2e)', () => {
     it('should create a service provider successfully (main user)', async () => {
       const dto = {
         ...createServiceProviderDto,
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/service-providers')
         .send(dto)
         .expect(201);
@@ -104,10 +109,13 @@ describe('Service Providers Management Flow (e2e)', () => {
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/service-providers')
         .send(dto)
         .expect(201);
@@ -123,39 +131,60 @@ describe('Service Providers Management Flow (e2e)', () => {
     it('should fail without add permission', async () => {
       const dto = {
         ...createServiceProviderDto,
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
         .expect(403);
     });
 
     it('should fail with duplicate code for same company', async () => {
+      // Clean up any existing service provider with this code first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       const dto = {
         ...createServiceProviderDto,
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
 
       // Create first service provider
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(201);
 
       // Try to create duplicate
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(409);
     });
 
     it('should allow same code for different companies', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
+      // Clean up any existing service provider with this code in first company
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -163,7 +192,15 @@ describe('Service Providers Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      // Clean up any existing property with this code in other company
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: otherTestData.company.id,
+          code: '001',
+        },
+      });
+
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -181,7 +218,7 @@ describe('Service Providers Management Flow (e2e)', () => {
 
       const dto1 = {
         ...createServiceProviderDto,
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
       const dto2 = {
         ...createServiceProviderDto,
@@ -189,9 +226,9 @@ describe('Service Providers Management Flow (e2e)', () => {
       };
 
       // Create service provider in first company
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto1)
         .expect(201);
 
@@ -204,7 +241,7 @@ describe('Service Providers Management Flow (e2e)', () => {
         },
       });
 
-      const otherLoginResponse = await request(app.getHttpServer())
+      const otherLoginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherTestData.user.email,
@@ -215,7 +252,7 @@ describe('Service Providers Management Flow (e2e)', () => {
       const otherToken = otherLoginResponse.body.access_token;
 
       // Create service provider with same code in second company (should succeed)
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
         .set('Authorization', `Bearer ${otherToken}`)
         .send(dto2)
@@ -223,17 +260,17 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '003' }) // Missing required fields
         .expect(400);
     });
 
     it('should validate propertyIds requirement', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createServiceProviderDto,
           code: '004',
@@ -243,14 +280,14 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should validate status enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createServiceProviderDto,
           code: '005',
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
           status: 'invalid_status',
         })
@@ -259,33 +296,43 @@ describe('Service Providers Management Flow (e2e)', () => {
   });
 
   describe('GET /service-providers', () => {
+    let serviceProviderIds: string[] = [];
+
     beforeEach(async () => {
+      // Clean up any existing service providers with these codes first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['001', '002', '003'] },
+        },
+      });
+
       // Create test service providers
-      await context.prisma.serviceProvider.create({
+      const sp1 = await context.prisma.serviceProvider.create({
         data: {
           code: '001',
           name: 'Service Provider 1',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
-      await context.prisma.serviceProvider.create({
+      const sp2 = await context.prisma.serviceProvider.create({
         data: {
           code: '002',
           name: 'Service Provider 2',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
-      await context.prisma.serviceProvider.create({
+      const sp3 = await context.prisma.serviceProvider.create({
         data: {
           code: '003',
           name: 'Deleted Service Provider',
@@ -293,14 +340,27 @@ describe('Service Providers Management Flow (e2e)', () => {
           companyId: context.testCompany.id,
           deletedAt: new Date(), // Soft deleted
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
+      serviceProviderIds = [sp1.id, sp2.id, sp3.id];
+    });
+
+    afterEach(async () => {
+      if (serviceProviderIds.length > 0) {
+        await context.prisma.serviceProvider.deleteMany({
+          where: { id: { in: serviceProviderIds } },
+        });
+        serviceProviderIds = [];
+      }
     });
 
     it('should return all service providers for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/service-providers')
         .expect(200);
 
@@ -312,7 +372,10 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted service providers', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/service-providers')
         .expect(200);
 
@@ -338,7 +401,7 @@ describe('Service Providers Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -346,7 +409,7 @@ describe('Service Providers Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/service-providers')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -357,24 +420,40 @@ describe('Service Providers Management Flow (e2e)', () => {
     let serviceProviderId: string;
 
     beforeEach(async () => {
-      const serviceProvider = await prisma.serviceProvider.create({
+      // Clean up any existing service provider with this code first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const serviceProvider = await context.prisma.serviceProvider.create({
         data: {
           code: '001',
           name: 'Test Service Provider',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
       serviceProviderId = serviceProvider.id;
     });
 
+    afterEach(async () => {
+      if (serviceProviderId) {
+        await context.prisma.serviceProvider.deleteMany({
+          where: { id: serviceProviderId },
+        });
+      }
+    });
+
     it('should return a service provider by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -385,9 +464,9 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should return 404 for non-existent service provider', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/service-providers/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -398,9 +477,9 @@ describe('Service Providers Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -409,18 +488,34 @@ describe('Service Providers Management Flow (e2e)', () => {
     let serviceProviderId: string;
 
     beforeEach(async () => {
-      const serviceProvider = await prisma.serviceProvider.create({
+      // Clean up any existing service provider with this code first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const serviceProvider = await context.prisma.serviceProvider.create({
         data: {
           code: '001',
           name: 'Test Service Provider',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
       serviceProviderId = serviceProvider.id;
+    });
+
+    afterEach(async () => {
+      if (serviceProviderId) {
+        await context.prisma.serviceProvider.deleteMany({
+          where: { id: serviceProviderId },
+        });
+      }
     });
 
     it('should update a service provider', async () => {
@@ -429,9 +524,9 @@ describe('Service Providers Management Flow (e2e)', () => {
         status: 'inactive',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -443,14 +538,22 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ name: 'Updated Name' })
         .expect(403);
     });
 
     it('should fail with duplicate code', async () => {
+      // Clean up any existing service provider with this code first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '002',
+        },
+      });
+
       // Create another service provider
       await context.prisma.serviceProvider.create({
         data: {
@@ -459,15 +562,15 @@ describe('Service Providers Management Flow (e2e)', () => {
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
       // Try to update with duplicate code
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '002' })
         .expect(409);
     });
@@ -477,24 +580,40 @@ describe('Service Providers Management Flow (e2e)', () => {
     let serviceProviderId: string;
 
     beforeEach(async () => {
-      const serviceProvider = await prisma.serviceProvider.create({
+      // Clean up any existing service provider with this code first
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const serviceProvider = await context.prisma.serviceProvider.create({
         data: {
           code: '001',
           name: 'Test Service Provider',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
       serviceProviderId = serviceProvider.id;
     });
 
+    afterEach(async () => {
+      if (serviceProviderId) {
+        await context.prisma.serviceProvider.deleteMany({
+          where: { id: serviceProviderId },
+        });
+      }
+    });
+
     it('should soft delete a service provider', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -502,15 +621,16 @@ describe('Service Providers Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedServiceProvider = await prisma.serviceProvider.findUnique({
-        where: { id: serviceProviderId },
-      });
+      const deletedServiceProvider =
+        await context.prisma.serviceProvider.findUnique({
+          where: { id: serviceProviderId },
+        });
       expect(deletedServiceProvider?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/service-providers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -519,16 +639,16 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/service-providers/${serviceProviderId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent service provider', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/service-providers/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -539,8 +659,13 @@ describe('Service Providers Management Flow (e2e)', () => {
     let serviceProviderId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -558,7 +683,7 @@ describe('Service Providers Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -568,15 +693,23 @@ describe('Service Providers Management Flow (e2e)', () => {
 
       otherToken = loginResponse.body.access_token;
 
+      // Clean up any existing service provider with this code in first company
+      await context.prisma.serviceProvider.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       // Create service provider for first company
-      const serviceProvider = await prisma.serviceProvider.create({
+      const serviceProvider = await context.prisma.serviceProvider.create({
         data: {
           code: '001',
           name: 'First Company Service Provider',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
@@ -584,14 +717,14 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company service providers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/service-providers/${serviceProviderId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company service providers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/service-providers/${serviceProviderId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ name: 'Hacked Name' })
@@ -599,7 +732,7 @@ describe('Service Providers Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company service providers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/service-providers/${serviceProviderId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);

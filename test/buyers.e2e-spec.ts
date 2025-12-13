@@ -1,8 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('Buyers Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -40,7 +43,7 @@ describe('Buyers Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -48,12 +51,11 @@ describe('Buyers Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /buyers', () => {
@@ -65,8 +67,11 @@ describe('Buyers Management Flow (e2e)', () => {
     };
 
     it('should create a buyer successfully (main user)', async () => {
-      const dto = { ...createBuyerDto, propertyIds: [testProperty.id] };
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const dto = { ...createBuyerDto, propertyIds: [context.testProperty.id] };
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/buyers')
         .send(dto)
         .expect(201);
@@ -96,10 +101,13 @@ describe('Buyers Management Flow (e2e)', () => {
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
-        propertyIds: [testProperty.id],
+        propertyIds: [context.testProperty.id],
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/buyers')
         .send(dto)
         .expect(201);
@@ -113,35 +121,52 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should fail without add permission', async () => {
-      const dto = { ...createBuyerDto, propertyIds: [testProperty.id] };
-      await request(app.getHttpServer())
+      const dto = { ...createBuyerDto, propertyIds: [context.testProperty.id] };
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
         .expect(403);
     });
 
     it('should fail with duplicate code for same company', async () => {
-      const dto = { ...createBuyerDto, propertyIds: [testProperty.id] };
+      // Clean up any existing buyer with this code first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'DUPLICATE-001',
+        },
+      });
+
+      const dto = {
+        ...createBuyerDto,
+        code: 'DUPLICATE-001',
+        propertyIds: [context.testProperty.id],
+      };
 
       // Create first buyer
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(201);
 
       // Try to create duplicate
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(409);
     });
 
     it('should allow same code for different companies', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -149,7 +174,7 @@ describe('Buyers Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -165,16 +190,31 @@ describe('Buyers Management Flow (e2e)', () => {
         },
       });
 
-      const dto1 = { ...createBuyerDto, propertyIds: [testProperty.id] };
+      // Clean up any existing buyers with these codes first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          OR: [
+            { companyId: context.testCompany.id, code: 'CROSS-001' },
+            { companyId: otherTestData.company.id, code: 'CROSS-001' },
+          ],
+        },
+      });
+
+      const dto1 = {
+        ...createBuyerDto,
+        code: 'CROSS-001',
+        propertyIds: [context.testProperty.id],
+      };
       const dto2 = {
         ...createBuyerDto,
+        code: 'CROSS-001',
         propertyIds: [otherProperty.id],
       };
 
       // Create buyer in first company
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto1)
         .expect(201);
 
@@ -187,7 +227,7 @@ describe('Buyers Management Flow (e2e)', () => {
         },
       });
 
-      const otherLoginResponse = await request(app.getHttpServer())
+      const otherLoginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherTestData.user.email,
@@ -198,7 +238,7 @@ describe('Buyers Management Flow (e2e)', () => {
       const otherToken = otherLoginResponse.body.access_token;
 
       // Create buyer with same code in second company (should succeed)
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
         .set('Authorization', `Bearer ${otherToken}`)
         .send(dto2)
@@ -206,17 +246,17 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '003' }) // Missing required fields
         .expect(400);
     });
 
     it('should validate propertyIds requirement', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createBuyerDto,
           code: '004',
@@ -226,13 +266,13 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should validate status enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createBuyerDto,
           code: '005',
-          propertyIds: [testProperty.id],
+          propertyIds: [context.testProperty.id],
           status: 'invalid_status',
         })
         .expect(400);
@@ -241,47 +281,57 @@ describe('Buyers Management Flow (e2e)', () => {
 
   describe('GET /buyers', () => {
     beforeEach(async () => {
+      // Clean up all buyers for this company to ensure clean state
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+        },
+      });
+
       // Create test buyers
       await context.prisma.buyer.create({
         data: {
-          code: '001',
+          code: 'GET-001',
           name: 'Buyer 1',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
       await context.prisma.buyer.create({
         data: {
-          code: '002',
+          code: 'GET-002',
           name: 'Buyer 2',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
       await context.prisma.buyer.create({
         data: {
-          code: '003',
+          code: 'GET-003',
           name: 'Deleted Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           deletedAt: new Date(), // Soft deleted
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
     });
 
     it('should return all buyers for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/buyers')
         .expect(200);
 
@@ -293,12 +343,15 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted buyers', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/buyers')
         .expect(200);
 
       const codes = response.body.map((b: any) => b.code);
-      expect(codes).not.toContain('003');
+      expect(codes).not.toContain('GET-003');
     });
 
     it('should fail without view permission', async () => {
@@ -314,7 +367,7 @@ describe('Buyers Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -322,7 +375,7 @@ describe('Buyers Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/buyers')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -333,14 +386,22 @@ describe('Buyers Management Flow (e2e)', () => {
     let buyerId: string;
 
     beforeEach(async () => {
-      const buyer = await prisma.buyer.create({
+      // Clean up any existing buyer with this code first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'GET-ID-001',
+        },
+      });
+
+      const buyer = await context.prisma.buyer.create({
         data: {
-          code: '001',
+          code: 'GET-ID-001',
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
@@ -348,22 +409,22 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should return a buyer by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
         id: buyerId,
-        code: '001',
+        code: 'GET-ID-001',
         name: 'Test Buyer',
       });
     });
 
     it('should return 404 for non-existent buyer', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/buyers/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -374,9 +435,9 @@ describe('Buyers Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -385,14 +446,22 @@ describe('Buyers Management Flow (e2e)', () => {
     let buyerId: string;
 
     beforeEach(async () => {
-      const buyer = await prisma.buyer.create({
+      // Clean up any existing buyers with these codes first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['PUT-001', 'PUT-002'] },
+        },
+      });
+
+      const buyer = await context.prisma.buyer.create({
         data: {
-          code: '001',
+          code: 'PUT-001',
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
@@ -405,9 +474,9 @@ describe('Buyers Management Flow (e2e)', () => {
         status: 'inactive',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -419,9 +488,9 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ name: 'Updated Name' })
         .expect(403);
     });
@@ -430,21 +499,21 @@ describe('Buyers Management Flow (e2e)', () => {
       // Create another buyer
       await context.prisma.buyer.create({
         data: {
-          code: '002',
+          code: 'PUT-002',
           name: 'Other Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
 
       // Try to update with duplicate code
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
-        .send({ code: '002' })
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send({ code: 'PUT-002' })
         .expect(409);
     });
   });
@@ -453,14 +522,22 @@ describe('Buyers Management Flow (e2e)', () => {
     let buyerId: string;
 
     beforeEach(async () => {
-      const buyer = await prisma.buyer.create({
+      // Clean up any existing buyer with this code first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'DELETE-001',
+        },
+      });
+
+      const buyer = await context.prisma.buyer.create({
         data: {
-          code: '001',
+          code: 'DELETE-001',
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
@@ -468,9 +545,9 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should soft delete a buyer', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -478,15 +555,15 @@ describe('Buyers Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedBuyer = await prisma.buyer.findUnique({
+      const deletedBuyer = await context.prisma.buyer.findUnique({
         where: { id: buyerId },
       });
       expect(deletedBuyer?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/buyers')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -495,16 +572,16 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/buyers/${buyerId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent buyer', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/buyers/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -515,8 +592,13 @@ describe('Buyers Management Flow (e2e)', () => {
     let buyerId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -534,7 +616,7 @@ describe('Buyers Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -544,15 +626,23 @@ describe('Buyers Management Flow (e2e)', () => {
 
       otherToken = loginResponse.body.access_token;
 
+      // Clean up any existing buyer with this code first
+      await context.prisma.buyer.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'ISOLATE-001',
+        },
+      });
+
       // Create buyer for first company
-      const buyer = await prisma.buyer.create({
+      const buyer = await context.prisma.buyer.create({
         data: {
-          code: '001',
+          code: 'ISOLATE-001',
           name: 'First Company Buyer',
           status: 'active',
           companyId: context.testCompany.id,
           properties: {
-            create: [{ propertyId: testProperty.id }],
+            create: [{ propertyId: context.testProperty.id }],
           },
         },
       });
@@ -560,14 +650,14 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company buyers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/buyers/${buyerId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company buyers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/buyers/${buyerId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ name: 'Hacked Name' })
@@ -575,7 +665,7 @@ describe('Buyers Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company buyers', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/buyers/${buyerId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);

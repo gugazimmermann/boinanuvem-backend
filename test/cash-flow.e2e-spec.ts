@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -39,7 +40,10 @@ describe('Cash Flow Management Flow (e2e)', () => {
         status: 'completed',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/cash-flow')
         .send(createDto)
         .expect(201);
@@ -62,7 +66,10 @@ describe('Cash Flow Management Flow (e2e)', () => {
         paymentMethod: PaymentMethod.BANK_TRANSFER,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/cash-flow')
         .send(createDto)
         .expect(201);
@@ -107,7 +114,10 @@ describe('Cash Flow Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/cash-flow')
         .expect(200);
 
@@ -128,7 +138,10 @@ describe('Cash Flow Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/cash-flow/${transaction.id}`)
         .expect(200);
 
@@ -136,9 +149,9 @@ describe('Cash Flow Management Flow (e2e)', () => {
     });
 
     it('should return 404 if transaction not found', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/cash-flow/non-existent-id')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -160,9 +173,9 @@ describe('Cash Flow Management Flow (e2e)', () => {
         amount: 1500.0,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/cash-flow/${transaction.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -183,13 +196,13 @@ describe('Cash Flow Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/cash-flow/${transaction.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       // Verify transaction is soft deleted
-      const deletedTransaction = await prisma.cashFlow.findUnique({
+      const deletedTransaction = await context.prisma.cashFlow.findUnique({
         where: { id: transaction.id },
       });
       expect(deletedTransaction?.deletedAt).toBeDefined();

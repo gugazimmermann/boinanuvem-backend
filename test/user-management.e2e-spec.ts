@@ -1,9 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('User Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -24,7 +26,10 @@ describe('User Management Flow (e2e)', () => {
 
   describe('User Profile Management', () => {
     it('should get current user profile', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/users/me')
         .expect(200);
 
@@ -44,7 +49,10 @@ describe('User Management Flow (e2e)', () => {
         phone: '(11) 98765-4321',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put('/users/me')
         .send(updateData)
         .expect(200);
@@ -95,7 +103,10 @@ describe('User Management Flow (e2e)', () => {
         password: 'password123',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/users')
         .send(teamMemberData)
         .expect(201);
@@ -130,6 +141,14 @@ describe('User Management Flow (e2e)', () => {
     });
 
     it('should get team members list', async () => {
+      // Clean up any existing team members first (keep main user)
+      await context.prisma.user.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          mainUser: false,
+        },
+      });
+
       // Create a team member first
       const teamMember = await context.prisma.user.create({
         data: {
@@ -149,7 +168,10 @@ describe('User Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/users')
         .expect(200);
 
@@ -185,7 +207,10 @@ describe('User Management Flow (e2e)', () => {
         phone: '(11) 55555-5555',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/users/${teamMember.id}`)
         .send(updateData)
         .expect(200);
@@ -289,9 +314,9 @@ describe('User Management Flow (e2e)', () => {
         },
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/users/${teamMember.id}/permissions`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(permissionsData)
         .expect(200);
 
@@ -313,9 +338,9 @@ describe('User Management Flow (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/users/${teamMember.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body.message).toBe('User deactivated successfully');
@@ -343,7 +368,7 @@ describe('User Management Flow (e2e)', () => {
       });
 
       // Login as team member
-      const teamLoginResponse = await request(app.getHttpServer())
+      const teamLoginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: teamMember.email,
@@ -354,7 +379,7 @@ describe('User Management Flow (e2e)', () => {
       const teamAuthToken = teamLoginResponse.body.access_token;
 
       // Try to create another team member (should fail)
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
         .set('Authorization', `Bearer ${teamAuthToken}`)
         .send({
@@ -370,11 +395,11 @@ describe('User Management Flow (e2e)', () => {
 
   describe('Authorization and Security', () => {
     it('should require authentication for protected routes', async () => {
-      await request(app.getHttpServer()).get('/users/me').expect(401);
+      await request(context.app.getHttpServer()).get('/users/me').expect(401);
 
-      await request(app.getHttpServer()).get('/users').expect(401);
+      await request(context.app.getHttpServer()).get('/users').expect(401);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
         .send({
           email: 'test@test.com',
@@ -385,7 +410,7 @@ describe('User Management Flow (e2e)', () => {
 
     it('should prevent access to other company users', async () => {
       // Create another company and user
-      const otherCompanyData = await createTestCompany(prisma, {
+      const otherCompanyData = await createTestCompany(context.prisma, {
         companyName: 'Other Company',
         email: 'other@company.com',
         cnpj: '99.888.777/0001-66',
@@ -414,7 +439,7 @@ describe('User Management Flow (e2e)', () => {
     });
 
     it('should handle invalid JWT tokens', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/users/me')
         .set('Authorization', 'Bearer invalid-token')
         .expect(401);
@@ -423,7 +448,7 @@ describe('User Management Flow (e2e)', () => {
     it('should handle expired JWT tokens', async () => {
       // This would require mocking time or using a very short-lived token
       // For now, we'll test with a malformed token
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/users/me')
         .set('Authorization', 'Bearer expired.jwt.token')
         .expect(401);
@@ -432,9 +457,9 @@ describe('User Management Flow (e2e)', () => {
 
   describe('Data Validation', () => {
     it('should validate email format during user creation', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           email: 'invalid-email',
           name: 'Test User',
@@ -446,9 +471,9 @@ describe('User Management Flow (e2e)', () => {
     });
 
     it('should validate CPF format during user creation', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           email: 'test@test.com',
           name: 'Test User',
@@ -460,9 +485,9 @@ describe('User Management Flow (e2e)', () => {
     });
 
     it('should accept any string as phone format', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           email: 'phonetest@test.com',
           name: 'Test User',
@@ -474,9 +499,9 @@ describe('User Management Flow (e2e)', () => {
     });
 
     it('should require strong password during user creation', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/users')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           email: 'test@test.com',
           name: 'Test User',

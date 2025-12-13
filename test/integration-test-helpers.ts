@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../src/common/services/prisma.service';
 
 /**
  * Integration test helpers for common setup and teardown patterns
@@ -55,10 +56,12 @@ export async function setupIntegrationTest(
   const prisma = createTestPrismaClient();
   await prisma.$connect();
 
-  // Clean up any existing test company first
+  // Clean up any existing test company first (by CNPJ and email to avoid unique constraint issues)
   await prisma.company
     .deleteMany({
-      where: { cnpj: options.cnpj },
+      where: {
+        OR: [{ cnpj: options.cnpj }, { email: options.email }],
+      },
     })
     .catch(() => {});
 

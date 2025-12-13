@@ -112,27 +112,28 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       expect(result.id).toBeDefined();
 
       // Verify company trial status was updated
-      const company = await prisma.company.findUnique({
-        where: { id: testCompany.id },
+      const company = await context.prisma.company.findUnique({
+        where: { id: context.testCompany.id },
       });
       expect(company?.trialStatus).toBe('converted');
     });
 
     it('should deactivate existing active subscription when creating new one', async () => {
       // Create existing subscription
-      const existingSubscription = await prisma.companySubscription.create({
-        data: {
-          companyId: context.testCompany.id,
-          planId: testPlan.id,
-          billingCycle: 'monthly',
-          status: 'active',
-          isActive: true,
-          isTrial: false,
-        },
-      });
+      const existingSubscription =
+        await context.prisma.companySubscription.create({
+          data: {
+            companyId: context.testCompany.id,
+            planId: testPlan.id,
+            billingCycle: 'monthly',
+            status: 'active',
+            isActive: true,
+            isTrial: false,
+          },
+        });
 
       // Create another plan with unique name
-      const newPlan = await prisma.plan.create({
+      const newPlan = await context.prisma.plan.create({
         data: {
           name: `New Test Plan ${Date.now()}`,
           description: 'New test plan',
@@ -159,9 +160,10 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       const result = await service.createSubscription(dto, mainUser.id);
 
       // Verify old subscription was deactivated
-      const oldSubscription = await prisma.companySubscription.findUnique({
-        where: { id: existingSubscription.id },
-      });
+      const oldSubscription =
+        await context.prisma.companySubscription.findUnique({
+          where: { id: existingSubscription.id },
+        });
       expect(oldSubscription?.isActive).toBe(false);
       expect(oldSubscription?.status).toBe('cancelled');
 
@@ -210,7 +212,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
         })
         .catch(() => {});
 
-      const inactivePlan = await prisma.plan.create({
+      const inactivePlan = await context.prisma.plan.create({
         data: {
           name: 'Inactive Plan',
           description: 'Inactive plan',
@@ -247,7 +249,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
   describe('getCurrentSubscription with real database', () => {
     it('should return current active subscription', async () => {
-      const subscription = await prisma.companySubscription.create({
+      const subscription = await context.prisma.companySubscription.create({
         data: {
           companyId: context.testCompany.id,
           planId: testPlan.id,
@@ -259,7 +261,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       });
 
       const result = await service.getCurrentSubscription(
-        testCompany.id,
+        context.testCompany.id,
         mainUser.id,
       );
 
@@ -274,13 +276,13 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
     it('should fail if no active subscription exists', async () => {
       await expect(
-        service.getCurrentSubscription(testCompany.id, mainUser.id),
+        service.getCurrentSubscription(context.testCompany.id, mainUser.id),
       ).rejects.toThrow('No active subscription found');
     });
 
     it('should fail if user does not belong to company', async () => {
       // Create another company
-      const otherCompany = await prisma.company.create({
+      const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
@@ -313,7 +315,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     let subscriptionId: string;
 
     beforeEach(async () => {
-      const subscription = await prisma.companySubscription.create({
+      const subscription = await context.prisma.companySubscription.create({
         data: {
           companyId: context.testCompany.id,
           planId: testPlan.id,
@@ -341,7 +343,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     });
 
     it('should update subscription plan', async () => {
-      const newPlan = await prisma.plan.create({
+      const newPlan = await context.prisma.plan.create({
         data: {
           name: `Updated Plan ${Date.now()}`,
           description: 'Updated plan',
@@ -395,7 +397,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     let subscriptionId: string;
 
     beforeEach(async () => {
-      const subscription = await prisma.companySubscription.create({
+      const subscription = await context.prisma.companySubscription.create({
         data: {
           companyId: context.testCompany.id,
           planId: testPlan.id,
@@ -419,16 +421,18 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     });
 
     it('should fail if subscription is a trial', async () => {
-      const trialSubscription = await prisma.companySubscription.create({
-        data: {
-          companyId: context.testCompany.id,
-          planId: testPlan.id,
-          billingCycle: 'monthly',
-          status: 'active',
-          isActive: true,
-          isTrial: true,
+      const trialSubscription = await context.prisma.companySubscription.create(
+        {
+          data: {
+            companyId: context.testCompany.id,
+            planId: testPlan.id,
+            billingCycle: 'monthly',
+            status: 'active',
+            isActive: true,
+            isTrial: true,
+          },
         },
-      });
+      );
 
       await expect(
         service.cancelSubscription(trialSubscription.id, mainUser.id),
@@ -458,7 +462,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
     it('should return subscription usage and limits', async () => {
       const result = await service.getSubscriptionUsage(
-        testCompany.id,
+        context.testCompany.id,
         mainUser.id,
       );
 
@@ -473,7 +477,7 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
 
     it('should check limits correctly', async () => {
       const result = await service.getSubscriptionUsage(
-        testCompany.id,
+        context.testCompany.id,
         mainUser.id,
       );
 

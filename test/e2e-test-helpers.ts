@@ -272,5 +272,40 @@ export function authenticatedRequest(
   app: INestApplication,
   token: string,
 ): request.SuperTest<request.Test> {
-  return request(app.getHttpServer()).set('Authorization', `Bearer ${token}`);
+  const supertest = request(app.getHttpServer());
+  const authHeader = `Bearer ${token}`;
+
+  // HTTP methods that return Test objects
+  const httpMethods = [
+    'get',
+    'post',
+    'put',
+    'delete',
+    'patch',
+    'head',
+    'options',
+  ];
+
+  return new Proxy(supertest, {
+    get(target, prop: string | symbol) {
+      const original = target[prop as keyof typeof target];
+
+      // If it's an HTTP method, wrap it to add Authorization header
+      if (
+        typeof prop === 'string' &&
+        httpMethods.includes(prop.toLowerCase())
+      ) {
+        return function (url: string) {
+          const test = original.call(target, url);
+          return test.set('Authorization', authHeader);
+        };
+      }
+
+      // For all other properties/methods, return as-is
+      if (typeof original === 'function') {
+        return original.bind(target);
+      }
+      return original;
+    },
+  }) as request.SuperTest<request.Test>;
 }

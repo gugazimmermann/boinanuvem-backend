@@ -35,7 +35,7 @@ describe('Sales Management Flow (e2e)', () => {
     testAnimals = context.testAnimals;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await teardownE2ETest(context);
   });
 
@@ -219,7 +219,7 @@ describe('Sales Management Flow (e2e)', () => {
     it('should validate required fields', async () => {
       await authenticatedRequest(context.app, context.mainUserToken)
         .post('/sales')
-        .send({ propertyId: testProperty.id })
+        .send({ propertyId: context.testProperty.id })
         .expect(400);
     });
 
@@ -383,7 +383,7 @@ describe('Sales Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.id).toBe(saleId);
-      expect(response.body.companyId).toBe(testCompany.id);
+      expect(response.body.companyId).toBe(context.testCompany.id);
       expect(response.body.saleItems).toBeDefined();
     });
 

@@ -1,8 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('Births Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -17,26 +20,9 @@ describe('Births Management Flow (e2e)', () => {
       createProperty: true,
     });
 
-    // Create a test property
-    testProperty = await prisma.property.create({
-      data: {
-        code: '001',
-        name: 'Test Property',
-        area: { value: 100, type: 'hectares' },
-        status: 'active',
-        companyId: context.testCompany.id,
-        street: 'Test Street',
-        number: '123',
-        neighborhood: 'Test Neighborhood',
-        city: 'Test City',
-        state: 'SC',
-        zipCode: '88395-000',
-      },
-    });
-
     // Create a regular user with limited permissions
     const hashedPassword = await require('bcrypt').hash('password123', 10);
-    const regularUser = await prisma.user.create({
+    const regularUser = await context.prisma.user.create({
       data: {
         name: 'Regular User',
         email: 'regular@testcompany.com',
@@ -54,7 +40,7 @@ describe('Births Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -62,12 +48,11 @@ describe('Births Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /births', () => {
@@ -79,8 +64,11 @@ describe('Births Management Flow (e2e)', () => {
     };
 
     it('should create a birth record and animal successfully', async () => {
-      const dto = { ...createBirthDto, propertyId: testProperty.id };
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const dto = { ...createBirthDto, propertyId: context.testProperty.id };
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/births')
         .send(dto)
         .expect(201);
@@ -94,7 +82,7 @@ describe('Births Management Flow (e2e)', () => {
       expect(response.body.createdAt).toBeDefined();
 
       // Verify animal was created
-      const animal = await prisma.animal.findUnique({
+      const animal = await context.prisma.animal.findUnique({
         where: { id: response.body.animalId },
       });
       expect(animal).toBeDefined();
@@ -112,7 +100,10 @@ describe('Births Management Flow (e2e)', () => {
         gender: 'male',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/births')
         .send(dto)
         .expect(201);
@@ -129,7 +120,10 @@ describe('Births Management Flow (e2e)', () => {
         propertyId: context.testProperty.id,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/births')
         .send(dto)
         .expect(201);
@@ -140,7 +134,7 @@ describe('Births Management Flow (e2e)', () => {
 
     it('should create birth with mother and father', async () => {
       // Create mother and father animals
-      const mother = await prisma.animal.create({
+      const mother = await context.prisma.animal.create({
         data: {
           code: 'MOTHER-001',
           registrationNumber: 'BR-2019-MJ0001',
@@ -150,7 +144,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const father = await prisma.animal.create({
+      const father = await context.prisma.animal.create({
         data: {
           code: 'FATHER-001',
           registrationNumber: 'BR-2018-MJ0002',
@@ -193,7 +187,10 @@ describe('Births Management Flow (e2e)', () => {
         breed: 'nelore',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/births')
         .send(dto)
         .expect(201);
@@ -205,28 +202,36 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should fail without add permission', async () => {
-      const dto = { ...createBirthDto, propertyId: testProperty.id };
-      await request(app.getHttpServer())
+      const dto = { ...createBirthDto, propertyId: context.testProperty.id };
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
         .expect(403);
     });
 
     it('should fail with duplicate animal code', async () => {
-      const dto = { ...createBirthDto, propertyId: testProperty.id };
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const dto = { ...createBirthDto, propertyId: context.testProperty.id };
 
       // Create first birth
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(201);
 
       // Try to create duplicate
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(409);
     });
@@ -236,16 +241,21 @@ describe('Births Management Flow (e2e)', () => {
         ...createBirthDto,
         propertyId: 'non-existent-property-id',
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
 
     it('should fail if mother does not belong to company', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -253,7 +263,7 @@ describe('Births Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -269,7 +279,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const otherMother = await prisma.animal.create({
+      const otherMother = await context.prisma.animal.create({
         data: {
           code: 'OTHER-MOTHER',
           registrationNumber: 'BR-2019-OTHER',
@@ -287,25 +297,25 @@ describe('Births Management Flow (e2e)', () => {
         motherId: otherMother.id,
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '006' }) // Missing required fields
         .expect(400);
     });
 
     it('should validate birth date format', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createBirthDto,
           code: '007',
@@ -319,12 +329,24 @@ describe('Births Management Flow (e2e)', () => {
 
   describe('GET /births', () => {
     let birthId2: string;
+    let animalIds: string[] = [];
 
     beforeEach(async () => {
+      // Clean up any existing births and animals with these codes first
+      await context.prisma.birth.deleteMany({
+        where: { companyId: context.testCompany.id },
+      });
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['GET-001', 'GET-002'] },
+        },
+      });
+
       // Create test animals and births
-      const animal1 = await prisma.animal.create({
+      const animal1 = await context.prisma.animal.create({
         data: {
-          code: '001',
+          code: 'GET-001',
           registrationNumber: 'BR-2020-FJ0001',
           status: 'active',
           companyId: context.testCompany.id,
@@ -342,9 +364,9 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const animal2 = await prisma.animal.create({
+      const animal2 = await context.prisma.animal.create({
         data: {
-          code: '002',
+          code: 'GET-002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
@@ -352,7 +374,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const birth2 = await prisma.birth.create({
+      const birth2 = await context.prisma.birth.create({
         data: {
           animalId: animal2.id,
           birthDate: new Date('2020-02-20'),
@@ -363,10 +385,23 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
       birthId2 = birth2.id;
+      animalIds = [animal1.id, animal2.id];
+    });
+
+    afterEach(async () => {
+      if (animalIds.length > 0) {
+        await context.prisma.animal.deleteMany({
+          where: { id: { in: animalIds } },
+        });
+        animalIds = [];
+      }
     });
 
     it('should return all births for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/births')
         .expect(200);
 
@@ -378,7 +413,10 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted births', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/births')
         .expect(200);
 
@@ -404,7 +442,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -412,7 +450,7 @@ describe('Births Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/births')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -424,7 +462,15 @@ describe('Births Management Flow (e2e)', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -435,7 +481,7 @@ describe('Births Management Flow (e2e)', () => {
       });
       animalId = animal.id;
 
-      const birth = await prisma.birth.create({
+      const birth = await context.prisma.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date('2020-01-15'),
@@ -445,12 +491,21 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
       birthId = birth.id;
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should return a birth by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -463,9 +518,9 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should return 404 for non-existent birth', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/births/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -476,9 +531,9 @@ describe('Births Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -488,7 +543,15 @@ describe('Births Management Flow (e2e)', () => {
     let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -499,7 +562,7 @@ describe('Births Management Flow (e2e)', () => {
       });
       animalId = animal.id;
 
-      const birth = await prisma.birth.create({
+      const birth = await context.prisma.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date('2020-01-15'),
@@ -512,9 +575,9 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should return a birth by animal id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/births/animal/${animalId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -525,9 +588,17 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should return 404 for animal without birth record', async () => {
-      const animalWithoutBirth = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'BIRTH-404-002',
+        },
+      });
+
+      const animalWithoutBirth = await context.prisma.animal.create({
         data: {
-          code: '002',
+          code: 'BIRTH-404-002',
           registrationNumber: 'BR-2020-FJ0002',
           status: 'active',
           companyId: context.testCompany.id,
@@ -535,15 +606,20 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/births/animal/${animalWithoutBirth.id}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
     it('should return 404 for animal from different company', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -551,7 +627,7 @@ describe('Births Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -567,7 +643,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const otherAnimal = await prisma.animal.create({
+      const otherAnimal = await context.prisma.animal.create({
         data: {
           code: 'OTHER-001',
           registrationNumber: 'BR-2020-OTHER',
@@ -577,9 +653,9 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/births/animal/${otherAnimal.id}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -588,7 +664,15 @@ describe('Births Management Flow (e2e)', () => {
     let birthId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -598,7 +682,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const birth = await prisma.birth.create({
+      const birth = await context.prisma.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date('2020-01-15'),
@@ -616,9 +700,9 @@ describe('Births Management Flow (e2e)', () => {
         gender: 'female',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -634,9 +718,9 @@ describe('Births Management Flow (e2e)', () => {
         birthDate: '2020-02-20',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -644,10 +728,18 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should update mother and father', async () => {
+      // Clean up any existing animals with these codes first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['BIRTH-MOTHER-001', 'BIRTH-FATHER-001'] },
+        },
+      });
+
       // Create mother and father animals
-      const mother = await prisma.animal.create({
+      const mother = await context.prisma.animal.create({
         data: {
-          code: 'MOTHER-001',
+          code: 'BIRTH-MOTHER-001',
           registrationNumber: 'BR-2019-MJ0001',
           status: 'active',
           companyId: context.testCompany.id,
@@ -655,9 +747,9 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const father = await prisma.animal.create({
+      const father = await context.prisma.animal.create({
         data: {
-          code: 'FATHER-001',
+          code: 'BIRTH-FATHER-001',
           registrationNumber: 'BR-2018-MJ0002',
           status: 'active',
           companyId: context.testCompany.id,
@@ -670,9 +762,9 @@ describe('Births Management Flow (e2e)', () => {
         fatherId: father.id,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -681,16 +773,21 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ breed: 'angus' })
         .expect(403);
     });
 
     it('should fail if mother does not belong to company', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -698,7 +795,7 @@ describe('Births Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -714,7 +811,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const otherMother = await prisma.animal.create({
+      const otherMother = await context.prisma.animal.create({
         data: {
           code: 'OTHER-MOTHER',
           registrationNumber: 'BR-2019-OTHER',
@@ -728,9 +825,9 @@ describe('Births Management Flow (e2e)', () => {
         motherId: otherMother.id,
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(404);
     });
@@ -738,9 +835,18 @@ describe('Births Management Flow (e2e)', () => {
 
   describe('DELETE /births/:id', () => {
     let birthId: string;
+    let animalId: string;
 
     beforeEach(async () => {
-      const animal = await prisma.animal.create({
+      // Clean up any existing animal with this code first
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -750,7 +856,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const birth = await prisma.birth.create({
+      const birth = await context.prisma.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date('2020-01-15'),
@@ -760,12 +866,21 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
       birthId = birth.id;
+      animalId = animal.id;
+    });
+
+    afterEach(async () => {
+      if (animalId) {
+        await context.prisma.animal.deleteMany({
+          where: { id: animalId },
+        });
+      }
     });
 
     it('should soft delete a birth record', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -773,15 +888,15 @@ describe('Births Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedBirth = await prisma.birth.findUnique({
+      const deletedBirth = await context.prisma.birth.findUnique({
         where: { id: birthId },
       });
       expect(deletedBirth?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/births')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -790,16 +905,16 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/births/${birthId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent birth', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/births/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -810,8 +925,13 @@ describe('Births Management Flow (e2e)', () => {
     let birthId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -829,7 +949,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -839,8 +959,16 @@ describe('Births Management Flow (e2e)', () => {
 
       otherToken = loginResponse.body.access_token;
 
+      // Clean up any existing animal with this code in first company
+      await context.prisma.animal.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       // Create birth for first company
-      const animal = await prisma.animal.create({
+      const animal = await context.prisma.animal.create({
         data: {
           code: '001',
           registrationNumber: 'BR-2020-FJ0001',
@@ -850,7 +978,7 @@ describe('Births Management Flow (e2e)', () => {
         },
       });
 
-      const birth = await prisma.birth.create({
+      const birth = await context.prisma.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date('2020-01-15'),
@@ -863,14 +991,14 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company births', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/births/${birthId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company births', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/births/${birthId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ breed: 'angus' })
@@ -878,7 +1006,7 @@ describe('Births Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company births', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/births/${birthId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);

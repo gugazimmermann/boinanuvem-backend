@@ -1,8 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('Properties Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -36,7 +39,7 @@ describe('Properties Management Flow (e2e)', () => {
       },
     });
 
-    const regularLoginResponse = await request(app.getHttpServer())
+    const regularLoginResponse = await request(context.app.getHttpServer())
       .post('/auth/login')
       .send({
         email: regularUser.email,
@@ -44,12 +47,11 @@ describe('Properties Management Flow (e2e)', () => {
       })
       .expect(200);
 
-    authToken = regularLoginResponse.body.access_token;
+    context.authToken = regularLoginResponse.body.access_token;
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /properties', () => {
@@ -70,7 +72,10 @@ describe('Properties Management Flow (e2e)', () => {
     };
 
     it('should create a property successfully (main user)', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/properties')
         .send(createPropertyDto)
         .expect(201);
@@ -103,7 +108,10 @@ describe('Properties Management Flow (e2e)', () => {
         breedingSeasonModifiedByUser: true,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/properties')
         .send(dtoWithOptional)
         .expect(201);
@@ -115,41 +123,44 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should fail without add permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/properties')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send(createPropertyDto)
         .expect(403);
     });
 
     it('should fail with duplicate code for same company', async () => {
+      // Use a unique code that doesn't conflict with setupE2ETest property
+      const dto = { ...createPropertyDto, code: 'DUPLICATE-001' };
+
       // Create first property
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
-        .send(createPropertyDto)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(dto)
         .expect(201);
 
       // Try to create duplicate
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
-        .send(createPropertyDto)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send(dto)
         .expect(409);
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '003' }) // Missing required fields
         .expect(400);
     });
 
     it('should validate area type enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createPropertyDto,
           code: '004',
@@ -160,12 +171,22 @@ describe('Properties Management Flow (e2e)', () => {
   });
 
   describe('GET /properties', () => {
+    let propertyIds: string[] = [];
+
     beforeEach(async () => {
-      // Create test properties
-      await context.prisma.property.createMany({
-        data: [
-          {
-            code: '001',
+      // Clean up any existing properties with these codes first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: { in: ['GET-001', 'GET-002', 'GET-003'] },
+        },
+      });
+
+      // Create test properties with unique codes
+      const properties = await Promise.all([
+        context.prisma.property.create({
+          data: {
+            code: 'GET-001',
             name: 'Property 1',
             area: { value: 100, type: 'hectares' },
             status: 'active',
@@ -177,8 +198,10 @@ describe('Properties Management Flow (e2e)', () => {
             state: 'SC',
             zipCode: '88395-000',
           },
-          {
-            code: '002',
+        }),
+        context.prisma.property.create({
+          data: {
+            code: 'GET-002',
             name: 'Property 2',
             area: { value: 200, type: 'hectares' },
             status: 'active',
@@ -190,8 +213,10 @@ describe('Properties Management Flow (e2e)', () => {
             state: 'SC',
             zipCode: '88395-000',
           },
-          {
-            code: '003',
+        }),
+        context.prisma.property.create({
+          data: {
+            code: 'GET-003',
             name: 'Deleted Property',
             area: { value: 300, type: 'hectares' },
             status: 'active',
@@ -204,29 +229,50 @@ describe('Properties Management Flow (e2e)', () => {
             zipCode: '88395-000',
             deletedAt: new Date(), // Soft deleted
           },
-        ],
-      });
+        }),
+      ]);
+      propertyIds = properties.map((p) => p.id);
+    });
+
+    afterEach(async () => {
+      if (propertyIds.length > 0) {
+        await context.prisma.property.deleteMany({
+          where: { id: { in: propertyIds } },
+        });
+        propertyIds = [];
+      }
     });
 
     it('should return all properties for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/properties')
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(2); // Excludes soft-deleted
+      // Should return 2 active properties (GET-001 and GET-002), excluding soft-deleted (GET-003) and setupE2ETest property
+      expect(response.body.length).toBeGreaterThanOrEqual(2);
+      // Verify our test properties are in the response
+      const codes = response.body.map((p: any) => p.code);
+      expect(codes).toContain('GET-001');
+      expect(codes).toContain('GET-002');
       expect(response.body[0]).toHaveProperty('id');
       expect(response.body[0]).toHaveProperty('code');
       expect(response.body[0]).toHaveProperty('name');
     });
 
     it('should exclude soft-deleted properties', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/properties')
         .expect(200);
 
       const codes = response.body.map((p: any) => p.code);
-      expect(codes).not.toContain('003');
+      expect(codes).not.toContain('GET-003');
     });
 
     it('should fail without view permission', async () => {
@@ -242,7 +288,7 @@ describe('Properties Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -250,7 +296,7 @@ describe('Properties Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/properties')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -261,7 +307,15 @@ describe('Properties Management Flow (e2e)', () => {
     let propertyId: string;
 
     beforeEach(async () => {
-      const property = await prisma.property.create({
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Test Property',
@@ -279,10 +333,18 @@ describe('Properties Management Flow (e2e)', () => {
       propertyId = property.id;
     });
 
+    afterEach(async () => {
+      if (propertyId) {
+        await context.prisma.property.deleteMany({
+          where: { id: propertyId },
+        });
+      }
+    });
+
     it('should return a property by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -293,9 +355,9 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should return 404 for non-existent property', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/properties/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -306,9 +368,9 @@ describe('Properties Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -317,7 +379,15 @@ describe('Properties Management Flow (e2e)', () => {
     let propertyId: string;
 
     beforeEach(async () => {
-      const property = await prisma.property.create({
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Test Property',
@@ -335,15 +405,23 @@ describe('Properties Management Flow (e2e)', () => {
       propertyId = property.id;
     });
 
+    afterEach(async () => {
+      if (propertyId) {
+        await context.prisma.property.deleteMany({
+          where: { id: propertyId },
+        });
+      }
+    });
+
     it('should update a property', async () => {
       const updateDto = {
         name: 'Updated Property Name',
         status: 'inactive',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -355,14 +433,22 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .send({ name: 'Updated Name' })
         .expect(403);
     });
 
     it('should fail with duplicate code', async () => {
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '002',
+        },
+      });
+
       // Create another property
       await context.prisma.property.create({
         data: {
@@ -381,9 +467,9 @@ describe('Properties Management Flow (e2e)', () => {
       });
 
       // Try to update with duplicate code
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '002' })
         .expect(409);
     });
@@ -393,7 +479,15 @@ describe('Properties Management Flow (e2e)', () => {
     let propertyId: string;
 
     beforeEach(async () => {
-      const property = await prisma.property.create({
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Test Property',
@@ -411,10 +505,18 @@ describe('Properties Management Flow (e2e)', () => {
       propertyId = property.id;
     });
 
+    afterEach(async () => {
+      if (propertyId) {
+        await context.prisma.property.deleteMany({
+          where: { id: propertyId },
+        });
+      }
+    });
+
     it('should soft delete a property', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -422,15 +524,15 @@ describe('Properties Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedProperty = await prisma.property.findUnique({
+      const deletedProperty = await context.prisma.property.findUnique({
         where: { id: propertyId },
       });
       expect(deletedProperty?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/properties')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -439,16 +541,16 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/properties/${propertyId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent property', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/properties/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -460,8 +562,13 @@ describe('Properties Management Flow (e2e)', () => {
     let propertyId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -480,7 +587,7 @@ describe('Properties Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -490,8 +597,16 @@ describe('Properties Management Flow (e2e)', () => {
 
       otherToken = loginResponse.body.access_token;
 
+      // Clean up any existing property with this code in first company
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
       // Create property for first company
-      const property = await prisma.property.create({
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'First Company Property',
@@ -510,14 +625,14 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company properties', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/properties/${propertyId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company properties', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/properties/${propertyId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ name: 'Hacked Name' })
@@ -525,7 +640,7 @@ describe('Properties Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company properties', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/properties/${propertyId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
@@ -533,7 +648,7 @@ describe('Properties Management Flow (e2e)', () => {
 
     it('should allow same code for different companies', async () => {
       // Create property with same code in other company
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .post('/properties')
         .set('Authorization', `Bearer ${otherToken}`)
         .send({

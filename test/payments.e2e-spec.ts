@@ -4,7 +4,7 @@ import {
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
-import { createTestPayment } from './test-utils';
+import { createTestPayment, createTestCompany } from './test-utils';
 import request from 'supertest';
 
 describe('Payments Management Flow (e2e)', () => {
@@ -21,7 +21,13 @@ describe('Payments Management Flow (e2e)', () => {
       isTrial: true,
       createRegularUser: true,
     });
-    subscription = context.subscription;
+    // Get subscription from database
+    subscription = await context.prisma.companySubscription.findFirst({
+      where: { companyId: context.testCompany.id },
+    });
+    if (!subscription) {
+      throw new Error('Subscription not found for test company');
+    }
 
     // Login regular user
     const regularLoginResponse = await request(context.app.getHttpServer())
@@ -51,14 +57,22 @@ describe('Payments Management Flow (e2e)', () => {
           status: 'pending',
         },
       );
-      await createTestPayment(prisma, testCompany.id, subscription.id, {
-        amount: 149.9,
-        status: 'paid',
-      });
+      await createTestPayment(
+        context.prisma,
+        context.testCompany.id,
+        subscription.id,
+        {
+          amount: 149.9,
+          status: 'paid',
+        },
+      );
     });
 
     it('should return company payments for main user', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/payments/company/${context.testCompany.id}`)
         .expect(200);
 
@@ -71,7 +85,7 @@ describe('Payments Management Flow (e2e)', () => {
 
     it('should return company payments for non-main user', async () => {
       // Non-main users can view company payments
-      const response = authenticatedRequest(context.app, regularUserToken)
+      const response = await authenticatedRequest(context.app, regularUserToken)
         .get(`/payments/company/${context.testCompany.id}`)
         .expect(200);
 
@@ -79,6 +93,11 @@ describe('Payments Management Flow (e2e)', () => {
     });
 
     it('should fail for different company', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
       const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
@@ -129,7 +148,10 @@ describe('Payments Management Flow (e2e)', () => {
     });
 
     it('should return payment details for authorized user', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/payments/${paymentId}`)
         .expect(200);
 
@@ -143,8 +165,13 @@ describe('Payments Management Flow (e2e)', () => {
     });
 
     it('should return 403 for different company payment', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company with payment
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -160,7 +187,7 @@ describe('Payments Management Flow (e2e)', () => {
         },
       });
 
-      const otherLoginResponse = await request(app.getHttpServer())
+      const otherLoginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherTestData.user.email,
@@ -200,7 +227,10 @@ describe('Payments Management Flow (e2e)', () => {
         subscriptionId: subscription.id,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/payments')
         .send(dto)
         .expect(201);
@@ -272,7 +302,10 @@ describe('Payments Management Flow (e2e)', () => {
         status: 'paid',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/payments/${paymentId}`)
         .send(updateDto)
         .expect(200);
@@ -302,6 +335,11 @@ describe('Payments Management Flow (e2e)', () => {
     });
 
     it('should return 403 for different company payment', async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
       const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
@@ -319,7 +357,7 @@ describe('Payments Management Flow (e2e)', () => {
         },
       });
 
-      const otherLoginResponse = await request(app.getHttpServer())
+      const otherLoginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherTestData.user.email,

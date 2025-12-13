@@ -1,8 +1,11 @@
+import request from 'supertest';
 import {
   setupE2ETest,
+  teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
+import { createTestCompany } from './test-utils';
 
 describe('Locations Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -52,8 +55,7 @@ describe('Locations Management Flow (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupTestData(prisma);
-    await app.close();
+    await teardownE2ETest(context);
   });
 
   describe('POST /locations', () => {
@@ -67,8 +69,11 @@ describe('Locations Management Flow (e2e)', () => {
     };
 
     it('should create a location successfully (main user)', async () => {
-      const dto = { ...createLocationDto, propertyId: testProperty.id };
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const dto = { ...createLocationDto, propertyId: context.testProperty.id };
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/locations')
         .send(dto)
         .expect(201);
@@ -96,9 +101,9 @@ describe('Locations Management Flow (e2e)', () => {
           propertyId: context.testProperty.id,
         };
 
-        const response = await request(app.getHttpServer())
+        const response = await request(context.app.getHttpServer())
           .post('/locations')
-          .set('Authorization', `Bearer ${mainUserToken}`)
+          .set('Authorization', `Bearer ${context.mainUserToken}`)
           .send(dto)
           .expect(201);
 
@@ -107,8 +112,8 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should fail without add permission', async () => {
-      const dto = { ...createLocationDto, propertyId: testProperty.id };
-      await request(app.getHttpServer())
+      const dto = { ...createLocationDto, propertyId: context.testProperty.id };
+      await request(context.app.getHttpServer())
         .post('/locations')
         .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
@@ -116,26 +121,51 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should fail with duplicate code for same property', async () => {
-      const dto = { ...createLocationDto, propertyId: testProperty.id };
+      // Clean up any existing location with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '001',
+        },
+      });
+
+      const dto = { ...createLocationDto, propertyId: context.testProperty.id };
 
       // Create first location
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(201);
 
       // Try to create duplicate
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(409);
     });
 
     it('should allow same code for different properties', async () => {
+      // Clean up any existing locations with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '001',
+        },
+      });
+
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '002',
+        },
+      });
+
       // Create another property
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '002',
           name: 'Other Property',
@@ -151,20 +181,23 @@ describe('Locations Management Flow (e2e)', () => {
         },
       });
 
-      const dto1 = { ...createLocationDto, propertyId: testProperty.id };
+      const dto1 = {
+        ...createLocationDto,
+        propertyId: context.testProperty.id,
+      };
       const dto2 = { ...createLocationDto, propertyId: otherProperty.id };
 
       // Create location in first property
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto1)
         .expect(201);
 
       // Create location with same code in second property (should succeed)
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto2)
         .expect(201);
     });
@@ -174,16 +207,16 @@ describe('Locations Management Flow (e2e)', () => {
         ...createLocationDto,
         propertyId: 'non-existent-property-id',
       };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
 
     it('should fail if property belongs to different company', async () => {
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -191,7 +224,7 @@ describe('Locations Management Flow (e2e)', () => {
         isTrial: true,
       });
 
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Other Company Property',
@@ -208,25 +241,25 @@ describe('Locations Management Flow (e2e)', () => {
       });
 
       const dto = { ...createLocationDto, propertyId: otherProperty.id };
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(404);
     });
 
     it('should validate required fields', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '003' }) // Missing required fields
         .expect(400);
     });
 
     it('should validate location type enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createLocationDto,
           code: '004',
@@ -237,9 +270,9 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should validate area type enum', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({
           ...createLocationDto,
           code: '005',
@@ -259,7 +292,10 @@ describe('Locations Management Flow (e2e)', () => {
         area: { value: '42.5' as any, type: 'hectares' }, // Send as string
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/locations')
         .send(dto)
         .expect(201);
@@ -288,21 +324,32 @@ describe('Locations Management Flow (e2e)', () => {
         area: { value: 'not-a-number' as any, type: 'hectares' },
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(dto)
         .expect(400);
     });
   });
 
   describe('GET /locations', () => {
+    let locationIds: string[] = [];
+
     beforeEach(async () => {
+      // Clean up any existing locations with these codes first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: { in: ['GET-001', 'GET-002', 'GET-003'] },
+        },
+      });
+
       // Create test locations
-      await context.prisma.location.createMany({
-        data: [
-          {
-            code: '001',
+      const locations = await Promise.all([
+        context.prisma.location.create({
+          data: {
+            code: 'GET-001',
             name: 'Location 1',
             locationType: 'pasture',
             area: { value: 28.5, type: 'hectares' },
@@ -310,8 +357,10 @@ describe('Locations Management Flow (e2e)', () => {
             companyId: context.testCompany.id,
             propertyId: context.testProperty.id,
           },
-          {
-            code: '002',
+        }),
+        context.prisma.location.create({
+          data: {
+            code: 'GET-002',
             name: 'Location 2',
             locationType: 'barn',
             area: { value: 15.0, type: 'hectares' },
@@ -319,8 +368,10 @@ describe('Locations Management Flow (e2e)', () => {
             companyId: context.testCompany.id,
             propertyId: context.testProperty.id,
           },
-          {
-            code: '003',
+        }),
+        context.prisma.location.create({
+          data: {
+            code: 'GET-003',
             name: 'Deleted Location',
             locationType: 'storage',
             area: { value: 10.0, type: 'hectares' },
@@ -329,17 +380,35 @@ describe('Locations Management Flow (e2e)', () => {
             propertyId: context.testProperty.id,
             deletedAt: new Date(), // Soft deleted
           },
-        ],
-      });
+        }),
+      ]);
+      locationIds = locations.map((l) => l.id);
+    });
+
+    afterEach(async () => {
+      if (locationIds.length > 0) {
+        await context.prisma.location.deleteMany({
+          where: { id: { in: locationIds } },
+        });
+        locationIds = [];
+      }
     });
 
     it('should return all locations for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/locations')
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(2); // Excludes soft-deleted
+      // Should return at least 2 active locations (GET-001 and GET-002), excluding soft-deleted (GET-003)
+      expect(response.body.length).toBeGreaterThanOrEqual(2);
+      // Verify our test locations are in the response
+      const codes = response.body.map((l: any) => l.code);
+      expect(codes).toContain('GET-001');
+      expect(codes).toContain('GET-002');
       expect(response.body[0]).toHaveProperty('id');
       expect(response.body[0]).toHaveProperty('code');
       expect(response.body[0]).toHaveProperty('name');
@@ -347,19 +416,39 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted locations', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/locations')
         .expect(200);
 
       const codes = response.body.map((l: any) => l.code);
-      expect(codes).not.toContain('003');
+      expect(codes).not.toContain('GET-003');
     });
 
     it('should filter by propertyId when provided', async () => {
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: 'FILTER-002',
+        },
+      });
+
+      // Clean up any existing locations for the test property to ensure clean state
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: { notIn: ['GET-001', 'GET-002', 'GET-003'] },
+        },
+      });
+
       // Create another property with locations
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
-          code: '002',
+          code: 'FILTER-002',
           name: 'Other Property',
           area: { value: 200, type: 'hectares' },
           status: 'active',
@@ -375,7 +464,7 @@ describe('Locations Management Flow (e2e)', () => {
 
       await context.prisma.location.create({
         data: {
-          code: '004',
+          code: 'FILTER-004',
           name: 'Other Property Location',
           locationType: 'pasture',
           area: { value: 30.0, type: 'hectares' },
@@ -385,14 +474,15 @@ describe('Locations Management Flow (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
-        .get(`/locations?propertyId=${testProperty.id}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+      const response = await request(context.app.getHttpServer())
+        .get(`/locations?propertyId=${context.testProperty.id}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
+      // Should only return locations for testProperty (GET-001 and GET-002, excluding GET-003 which is soft-deleted)
       expect(response.body.length).toBe(2);
       response.body.forEach((location: any) => {
-        expect(location.propertyId).toBe(testProperty.id);
+        expect(location.propertyId).toBe(context.testProperty.id);
       });
     });
 
@@ -409,7 +499,7 @@ describe('Locations Management Flow (e2e)', () => {
         },
       });
 
-      const newToken = await request(app.getHttpServer())
+      const newToken = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: 'regular@testcompany.com',
@@ -417,7 +507,7 @@ describe('Locations Management Flow (e2e)', () => {
         })
         .then((res) => res.body.access_token);
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/locations')
         .set('Authorization', `Bearer ${newToken}`)
         .expect(403);
@@ -428,7 +518,16 @@ describe('Locations Management Flow (e2e)', () => {
     let locationId: string;
 
     beforeEach(async () => {
-      const location = await prisma.location.create({
+      // Clean up any existing location with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '001',
+        },
+      });
+
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'Test Location',
@@ -442,10 +541,18 @@ describe('Locations Management Flow (e2e)', () => {
       locationId = location.id;
     });
 
+    afterEach(async () => {
+      if (locationId) {
+        await context.prisma.location.deleteMany({
+          where: { id: locationId },
+        });
+      }
+    });
+
     it('should return a location by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .get(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -457,9 +564,9 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should return 404 for non-existent location', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get('/locations/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
 
@@ -470,9 +577,9 @@ describe('Locations Management Flow (e2e)', () => {
         data: { deletedAt: new Date() },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -481,7 +588,16 @@ describe('Locations Management Flow (e2e)', () => {
     let locationId: string;
 
     beforeEach(async () => {
-      const location = await prisma.location.create({
+      // Clean up any existing location with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '001',
+        },
+      });
+
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'Test Location',
@@ -495,15 +611,23 @@ describe('Locations Management Flow (e2e)', () => {
       locationId = location.id;
     });
 
+    afterEach(async () => {
+      if (locationId) {
+        await context.prisma.location.deleteMany({
+          where: { id: locationId },
+        });
+      }
+    });
+
     it('should update a location', async () => {
       const updateDto = {
         name: 'Updated Location Name',
         status: 'inactive',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -519,9 +643,9 @@ describe('Locations Management Flow (e2e)', () => {
         locationType: 'barn',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -529,7 +653,7 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should fail without edit permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .send({ name: 'Updated Name' })
@@ -537,6 +661,15 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should fail with duplicate code in same property', async () => {
+      // Clean up any existing location with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '002',
+        },
+      });
+
       // Create another location
       await context.prisma.location.create({
         data: {
@@ -551,16 +684,24 @@ describe('Locations Management Flow (e2e)', () => {
       });
 
       // Try to update with duplicate code
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: '002' })
         .expect(409);
     });
 
     it('should allow updating propertyId to valid property', async () => {
+      // Clean up any existing property with this code first
+      await context.prisma.property.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          code: '002',
+        },
+      });
+
       // Create another property
-      const otherProperty = await prisma.property.create({
+      const otherProperty = await context.prisma.property.create({
         data: {
           code: '002',
           name: 'Other Property',
@@ -580,9 +721,9 @@ describe('Locations Management Flow (e2e)', () => {
         propertyId: otherProperty.id,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -595,9 +736,9 @@ describe('Locations Management Flow (e2e)', () => {
         area: { value: '50.75' as any, type: 'hectares' }, // Send as string
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -616,9 +757,9 @@ describe('Locations Management Flow (e2e)', () => {
         area: { value: '75.25' as any, type: 'square_meters' }, // Send as string
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -640,9 +781,9 @@ describe('Locations Management Flow (e2e)', () => {
         area: { value: 'invalid-number' as any, type: 'hectares' },
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(400);
     });
@@ -652,7 +793,16 @@ describe('Locations Management Flow (e2e)', () => {
     let locationId: string;
 
     beforeEach(async () => {
-      const location = await prisma.location.create({
+      // Clean up any existing location with this code first
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '001',
+        },
+      });
+
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'Test Location',
@@ -666,10 +816,18 @@ describe('Locations Management Flow (e2e)', () => {
       locationId = location.id;
     });
 
+    afterEach(async () => {
+      if (locationId) {
+        await context.prisma.location.deleteMany({
+          where: { id: locationId },
+        });
+      }
+    });
+
     it('should soft delete a location', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .delete(`/locations/${locationId}`)
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -677,15 +835,15 @@ describe('Locations Management Flow (e2e)', () => {
       });
 
       // Verify soft delete
-      const deletedLocation = await prisma.location.findUnique({
+      const deletedLocation = await context.prisma.location.findUnique({
         where: { id: locationId },
       });
       expect(deletedLocation?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResponse = await request(app.getHttpServer())
+      const listResponse = await request(context.app.getHttpServer())
         .get('/locations')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
       expect(
@@ -694,16 +852,16 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/locations/${locationId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent location', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete('/locations/non-existent-id')
-        .set('Authorization', `Bearer ${mainUserToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(404);
     });
   });
@@ -714,8 +872,13 @@ describe('Locations Management Flow (e2e)', () => {
     let locationId: string;
 
     beforeEach(async () => {
+      // Clean up any existing company with this CNPJ first
+      await context.prisma.company.deleteMany({
+        where: { cnpj: '22.333.444/0001-66' },
+      });
+
       // Create another company
-      const otherTestData = await createTestCompany(prisma, {
+      const otherTestData = await createTestCompany(context.prisma, {
         companyName: 'Other Test Company',
         email: 'other@testcompany.com',
         cnpj: '22.333.444/0001-66',
@@ -733,7 +896,7 @@ describe('Locations Management Flow (e2e)', () => {
         },
       });
 
-      const loginResponse = await request(app.getHttpServer())
+      const loginResponse = await request(context.app.getHttpServer())
         .post('/auth/login')
         .send({
           email: otherUser.email,
@@ -743,8 +906,17 @@ describe('Locations Management Flow (e2e)', () => {
 
       otherToken = loginResponse.body.access_token;
 
+      // Clean up any existing location with this code in first company
+      await context.prisma.location.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          propertyId: context.testProperty.id,
+          code: '001',
+        },
+      });
+
       // Create location for first company
-      const location = await prisma.location.create({
+      const location = await context.prisma.location.create({
         data: {
           code: '001',
           name: 'First Company Location',
@@ -759,14 +931,14 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should not allow access to other company locations', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .get(`/locations/${locationId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);
     });
 
     it('should not allow update of other company locations', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/locations/${locationId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .send({ name: 'Hacked Name' })
@@ -774,7 +946,7 @@ describe('Locations Management Flow (e2e)', () => {
     });
 
     it('should not allow delete of other company locations', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/locations/${locationId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(404);

@@ -240,7 +240,7 @@ describe('Company Management Flow (e2e)', () => {
     });
 
     it('should get company details for authenticated user', async () => {
-      const response = authenticatedRequest(app, authToken)
+      const response = await authenticatedRequest(app, authToken)
         .get(`/companies/${testCompany.id}`)
         .expect(200);
 
@@ -334,7 +334,7 @@ describe('Company Management Flow (e2e)', () => {
         state: 'RJ',
       };
 
-      const response = authenticatedRequest(app, authToken)
+      const response = await authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
         .send(updateData)
         .expect(200);
@@ -419,7 +419,7 @@ describe('Company Management Flow (e2e)', () => {
         companyName: 'Partially Updated Name',
       };
 
-      const response = authenticatedRequest(app, authToken)
+      const response = await authenticatedRequest(app, authToken)
         .put(`/companies/${testCompany.id}`)
         .send(partialUpdate)
         .expect(200);

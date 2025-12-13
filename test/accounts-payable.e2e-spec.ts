@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -34,7 +35,10 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         status: AccountsPayableStatus.UNPAID,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/accounts-payable')
         .send(createDto)
         .expect(201);
@@ -70,7 +74,10 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/accounts-payable')
         .expect(200);
 
@@ -90,7 +97,10 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/accounts-payable/${transaction.id}`)
         .expect(200);
 
@@ -116,9 +126,9 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         paidAmount: 1000.0,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/accounts-payable/${transaction.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -137,14 +147,15 @@ describe('Accounts Payable Management Flow (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/accounts-payable/${transaction.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .expect(200);
 
-      const deletedTransaction = await prisma.accountsPayable.findUnique({
-        where: { id: transaction.id },
-      });
+      const deletedTransaction =
+        await context.prisma.accountsPayable.findUnique({
+          where: { id: transaction.id },
+        });
       expect(deletedTransaction?.deletedAt).toBeDefined();
     });
   });

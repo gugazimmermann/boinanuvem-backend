@@ -145,7 +145,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
         },
       });
 
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: father.id,
           birthDate: new Date('2018-01-15'),
@@ -206,7 +206,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
         },
       });
 
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: father.id,
           birthDate: new Date('2018-01-15'),
@@ -234,7 +234,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
 
     it('should calculate purity when one parent is missing', async () => {
       // Create mother animal
-      const mother = await prisma.animal.create({
+      const mother = await context.prisma.animal.create({
         data: {
           code: 'MOTHER-003',
           registrationNumber: 'BR-2019-MJ0005',
@@ -245,7 +245,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
       });
 
       // Create birth record for mother
-      await prisma.birth.create({
+      await context.prisma.birth.create({
         data: {
           animalId: mother.id,
           birthDate: new Date('2019-01-15'),
@@ -278,7 +278,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
         birthDate: '2020-01-15',
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Try to create duplicate
       await expect(
@@ -463,7 +463,7 @@ describeOrSkip('BirthsService Integration Tests', () => {
         },
       });
 
-      const otherAnimal = await prisma.animal.create({
+      const otherAnimal = await context.prisma.animal.create({
         data: {
           code: 'OTHER-001',
           registrationNumber: 'BR-2020-OTHER',

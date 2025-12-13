@@ -78,7 +78,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
       expect(result.createdAt).toBeDefined();
 
       // Verify in database
-      const property = await prisma.property.findUnique({
+      const property = await context.prisma.property.findUnique({
         where: { id: result.id },
       });
       expect(property).toBeDefined();
@@ -99,17 +99,17 @@ describeOrSkip('PropertiesService Integration Tests', () => {
         zipCode: '88395-000',
       };
 
-      await service.create(testUser.id, createDto);
+      await service.create(context.testUser.id, createDto);
 
       // Try to create duplicate
-      await expect(service.create(testUser.id, createDto)).rejects.toThrow(
-        'Property with this code already exists',
-      );
+      await expect(
+        service.create(context.testUser.id, createDto),
+      ).rejects.toThrow('Property with this code already exists');
     });
 
     it('should allow same code for different companies', async () => {
       // Create another company
-      const otherCompany = await prisma.company.create({
+      const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
@@ -128,7 +128,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
       });
 
       const hashedPassword = await require('bcrypt').hash('password123', 10);
-      const otherUser = await prisma.user.create({
+      const otherUser = await context.prisma.user.create({
         data: {
           name: 'Other User',
           email: 'other-user@testcompany.com',
@@ -161,7 +161,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
       };
 
       // Create in first company
-      await service.create(testUser.id, createDto1);
+      await service.create(context.testUser.id, createDto1);
 
       // Create with same code in second company (should succeed)
       const result = await service.create(otherUser.id, createDto2);
@@ -228,7 +228,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
         ],
       });
 
-      const result = await service.findAll(testUser.id);
+      const result = await service.findAll(context.testUser.id);
 
       expect(result.length).toBe(2); // Excludes soft-deleted
       expect(result.every((p) => p.deletedAt === undefined)).toBe(true);
@@ -239,7 +239,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
     let propertyId: string;
 
     beforeEach(async () => {
-      const property = await prisma.property.create({
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Test Property',
@@ -263,7 +263,11 @@ describeOrSkip('PropertiesService Integration Tests', () => {
         status: 'inactive',
       };
 
-      const result = await service.update(testUser.id, propertyId, updateDto);
+      const result = await service.update(
+        context.testUser.id,
+        propertyId,
+        updateDto,
+      );
 
       expect(result).toMatchObject({
         id: propertyId,
@@ -277,7 +281,7 @@ describeOrSkip('PropertiesService Integration Tests', () => {
     let propertyId: string;
 
     beforeEach(async () => {
-      const property = await prisma.property.create({
+      const property = await context.prisma.property.create({
         data: {
           code: '001',
           name: 'Test Property',
@@ -296,20 +300,20 @@ describeOrSkip('PropertiesService Integration Tests', () => {
     });
 
     it('should soft delete a property', async () => {
-      const result = await service.remove(testUser.id, propertyId);
+      const result = await service.remove(context.testUser.id, propertyId);
 
       expect(result).toEqual({
         message: 'Property deleted successfully',
       });
 
       // Verify soft delete
-      const deletedProperty = await prisma.property.findUnique({
+      const deletedProperty = await context.prisma.property.findUnique({
         where: { id: propertyId },
       });
       expect(deletedProperty?.deletedAt).toBeDefined();
 
       // Verify it's excluded from list
-      const listResult = await service.findAll(testUser.id);
+      const listResult = await service.findAll(context.testUser.id);
       expect(listResult.find((p) => p.id === propertyId)).toBeUndefined();
     });
   });

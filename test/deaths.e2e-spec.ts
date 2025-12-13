@@ -1,10 +1,10 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
   authenticatedRequest,
   E2ETestContext,
 } from './e2e-test-helpers';
-import { createTestAnimals } from './test-data-factories';
 
 describe('Deaths Management Flow (e2e)', () => {
   let context: E2ETestContext;
@@ -32,11 +32,24 @@ describe('Deaths Management Flow (e2e)', () => {
       },
     });
 
-    testAnimals = await createTestAnimals(context.prisma, 2, {
-      companyId: context.testCompany.id,
-      propertyId: context.testProperty.id,
-      code: 'DEATH-001',
-      registrationNumber: 'BR-2020-DT0001',
+    // Clean up any existing animals with these codes first
+    await context.prisma.animal.deleteMany({
+      where: {
+        companyId: context.testCompany.id,
+        code: { in: ['DEATH-001', 'DEATH-002'] },
+      },
+    });
+
+    // Create animals individually to avoid code conflicts
+    testAnimals = [];
+    testAnimals[0] = await context.prisma.animal.create({
+      data: {
+        code: 'DEATH-001',
+        registrationNumber: 'BR-2020-DT0001',
+        status: 'active',
+        companyId: context.testCompany.id,
+        propertyId: context.testProperty.id,
+      },
     });
     testAnimals[1] = await context.prisma.animal.create({
       data: {
@@ -67,7 +80,10 @@ describe('Deaths Management Flow (e2e)', () => {
         animalId: testAnimals[0].id,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/deaths')
         .send(dto)
         .expect(201);
@@ -94,7 +110,7 @@ describe('Deaths Management Flow (e2e)', () => {
         animalId: testAnimals[0].id,
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .post('/deaths')
         .set('Authorization', `Bearer ${context.authToken}`)
         .send(dto)
@@ -102,6 +118,14 @@ describe('Deaths Management Flow (e2e)', () => {
     });
 
     it('should fail if animal already has active death', async () => {
+      // Clean up any existing death for this animal first
+      await context.prisma.death.deleteMany({
+        where: {
+          animalId: testAnimals[0].id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       // Create first death
       await context.prisma.death.create({
         data: {
@@ -147,6 +171,14 @@ describe('Deaths Management Flow (e2e)', () => {
     let deathId: string;
 
     beforeEach(async () => {
+      // Clean up any existing deaths for these animals first
+      await context.prisma.death.deleteMany({
+        where: {
+          companyId: context.testCompany.id,
+          animalId: { in: [testAnimals[0].id, testAnimals[1].id] },
+        },
+      });
+
       const death = await context.prisma.death.create({
         data: {
           animalId: testAnimals[0].id,
@@ -157,7 +189,7 @@ describe('Deaths Management Flow (e2e)', () => {
       });
       deathId = death.id;
 
-      await prisma.death.create({
+      await context.prisma.death.create({
         data: {
           animalId: testAnimals[1].id,
           deathDate: new Date('2020-02-20'),
@@ -169,7 +201,10 @@ describe('Deaths Management Flow (e2e)', () => {
     });
 
     it('should return all deaths for company', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/deaths')
         .expect(200);
 
@@ -180,7 +215,10 @@ describe('Deaths Management Flow (e2e)', () => {
     });
 
     it('should exclude soft-deleted deaths', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/deaths')
         .expect(200);
 
@@ -224,6 +262,14 @@ describe('Deaths Management Flow (e2e)', () => {
     let deathId: string;
 
     beforeEach(async () => {
+      // Clean up any existing death for this animal first
+      await context.prisma.death.deleteMany({
+        where: {
+          animalId: testAnimals[0].id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       const death = await context.prisma.death.create({
         data: {
           animalId: testAnimals[0].id,
@@ -236,12 +282,15 @@ describe('Deaths Management Flow (e2e)', () => {
     });
 
     it('should return death by ID', async () => {
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/deaths/${deathId}`)
         .expect(200);
 
       expect(response.body.id).toBe(deathId);
-      expect(response.body.companyId).toBe(testCompany.id);
+      expect(response.body.companyId).toBe(context.testCompany.id);
     });
 
     it('should fail if death not found', async () => {
@@ -253,6 +302,14 @@ describe('Deaths Management Flow (e2e)', () => {
 
   describe('GET /deaths/animal/:animalId', () => {
     it('should return death for animal', async () => {
+      // Clean up any existing death for this animal first
+      await context.prisma.death.deleteMany({
+        where: {
+          animalId: testAnimals[0].id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       const death = await context.prisma.death.create({
         data: {
           animalId: testAnimals[0].id,
@@ -262,7 +319,10 @@ describe('Deaths Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/deaths/animal/${testAnimals[0].id}`)
         .expect(200);
 
@@ -275,6 +335,14 @@ describe('Deaths Management Flow (e2e)', () => {
     let deathId: string;
 
     beforeEach(async () => {
+      // Clean up any existing death for this animal first
+      await context.prisma.death.deleteMany({
+        where: {
+          animalId: testAnimals[0].id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       const death = await context.prisma.death.create({
         data: {
           animalId: testAnimals[0].id,
@@ -292,7 +360,10 @@ describe('Deaths Management Flow (e2e)', () => {
         observation: 'Updated observation',
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .put(`/deaths/${deathId}`)
         .send(updateDto)
         .expect(200);
@@ -306,7 +377,7 @@ describe('Deaths Management Flow (e2e)', () => {
         cause: 'Updated cause',
       };
 
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .put(`/deaths/${deathId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .send(updateDto)
@@ -318,6 +389,14 @@ describe('Deaths Management Flow (e2e)', () => {
     let deathId: string;
 
     beforeEach(async () => {
+      // Clean up any existing death for this animal first
+      await context.prisma.death.deleteMany({
+        where: {
+          animalId: testAnimals[0].id,
+          companyId: context.testCompany.id,
+        },
+      });
+
       const death = await context.prisma.death.create({
         data: {
           animalId: testAnimals[0].id,
@@ -351,7 +430,7 @@ describe('Deaths Management Flow (e2e)', () => {
     });
 
     it('should fail without remove permission', async () => {
-      await request(app.getHttpServer())
+      await request(context.app.getHttpServer())
         .delete(`/deaths/${deathId}`)
         .set('Authorization', `Bearer ${context.authToken}`)
         .expect(403);

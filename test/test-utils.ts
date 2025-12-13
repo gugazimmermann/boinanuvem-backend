@@ -28,137 +28,352 @@ export function createTestPrismaClient(): PrismaClient {
  */
 export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   // Clean up in order due to foreign key constraints
+  // Start with child tables and work up to parent tables
 
-  // Clean up refresh tokens first (no foreign key constraints)
+  const testCompanyFilter = {
+    OR: [
+      { companyName: { contains: 'Test' } },
+      { companyName: { contains: 'E2E' } },
+      { companyName: { contains: 'First' } },
+      { companyName: { contains: 'Second' } },
+      { companyName: { contains: 'Another' } },
+      { companyName: { contains: 'Other' } },
+      { companyName: { contains: 'Trial' } },
+      { companyName: { contains: 'Registration' } },
+      { companyName: { contains: 'Update' } },
+      { companyName: { contains: 'Info' } },
+      { companyName: { contains: 'Existing' } },
+      { companyName: { contains: 'Suppliers' } },
+      { companyName: { contains: 'Sales' } },
+      { companyName: { contains: 'Weighings' } },
+      { companyName: { contains: 'Deaths' } },
+      { companyName: { contains: 'Breedings' } },
+      { companyName: { contains: 'Animals' } },
+      { email: { contains: 'test' } },
+      { email: { contains: 'registration' } },
+      { email: { contains: 'company' } },
+      { email: { contains: 'trial' } },
+      { email: { contains: 'update' } },
+      { email: { contains: 'info' } },
+      { email: { contains: 'existing' } },
+      { email: { contains: 'suppliers' } },
+      { email: { contains: 'sales' } },
+      { email: { contains: 'weighings' } },
+      { email: { contains: 'deaths' } },
+      { email: { contains: 'breedings' } },
+      { email: { contains: 'animals' } },
+    ],
+  };
+
+  // Clean up junction tables first
+  try {
+    await prisma.saleItem.deleteMany({
+      where: {
+        sale: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.acquisitionItem.deleteMany({
+      where: {
+        acquisition: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.employeeProperty.deleteMany({
+      where: {
+        property: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.serviceProviderProperty.deleteMany({
+      where: {
+        property: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.supplierProperty.deleteMany({
+      where: {
+        property: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.buyerProperty.deleteMany({
+      where: {
+        property: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.inventoryItemProperty.deleteMany({
+      where: {
+        property: { company: testCompanyFilter },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  // Clean up entities with foreign keys
   try {
     await prisma.refreshToken.deleteMany({
       where: {
         user: {
           OR: [
-            { email: { startsWith: 'test@' } },
-            { email: { startsWith: 'e2e@' } },
+            { email: { contains: 'test' } },
+            { email: { contains: 'e2e' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'user' } },
+            { email: { contains: 'duplicate' } },
+            { email: { contains: 'company' } },
+            { email: { contains: 'trial' } },
+            { email: { contains: 'regular' } },
           ],
         },
       },
     });
   } catch {
-    console.log('RefreshToken table not found, skipping cleanup');
+    // Ignore
+  }
+
+  try {
+    await prisma.emailVerification.deleteMany({
+      where: {
+        user: {
+          OR: [
+            { email: { contains: 'test' } },
+            { email: { contains: 'e2e' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'user' } },
+            { email: { contains: 'duplicate' } },
+            { email: { contains: 'company' } },
+            { email: { contains: 'trial' } },
+            { email: { contains: 'regular' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.passwordReset.deleteMany({
+      where: {
+        user: {
+          OR: [
+            { email: { contains: 'test' } },
+            { email: { contains: 'e2e' } },
+            { email: { contains: 'registration' } },
+            { email: { contains: 'user' } },
+            { email: { contains: 'duplicate' } },
+            { email: { contains: 'company' } },
+            { email: { contains: 'trial' } },
+            { email: { contains: 'regular' } },
+          ],
+        },
+      },
+    });
+  } catch {
+    // Ignore
   }
 
   try {
     await prisma.companyPayment.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
+      where: { company: testCompanyFilter },
     });
   } catch {
-    // Ignore if table doesn't exist
-    console.log('CompanyPayment table not found, skipping cleanup');
+    // Ignore
   }
 
   try {
     await prisma.companySubscription.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
+      where: { company: testCompanyFilter },
     });
   } catch {
-    // Ignore if table doesn't exist
-    console.log('CompanySubscription table not found, skipping cleanup');
+    // Ignore
   }
 
-  // Clean up sale items (child table, must be cleaned before sales)
-  try {
-    await prisma.saleItem.deleteMany({
-      where: {
-        sale: {
-          company: {
-            OR: [
-              { companyName: { contains: 'Test' } },
-              { companyName: { contains: 'E2E' } },
-              { email: { contains: 'test' } },
-              { email: { contains: 'registration' } },
-              { email: { contains: 'company' } },
-            ],
-          },
-        },
-      },
-    });
-  } catch {
-    console.log('SaleItem table not found, skipping cleanup');
-  }
-
-  // Clean up sales
   try {
     await prisma.sale.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
+      where: { company: testCompanyFilter },
     });
   } catch {
-    console.log('Sale table not found, skipping cleanup');
+    // Ignore
   }
 
-  // Clean up deaths
+  try {
+    await prisma.acquisition.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
   try {
     await prisma.death.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
+      where: { company: testCompanyFilter },
     });
   } catch {
-    console.log('Death table not found, skipping cleanup');
+    // Ignore
   }
 
-  // Clean up weighings
   try {
     await prisma.weighing.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
+      where: { company: testCompanyFilter },
     });
   } catch {
-    console.log('Weighing table not found, skipping cleanup');
+    // Ignore
+  }
+
+  try {
+    await prisma.birth.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.breeding.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.sanitaryControl.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.inventoryMovement.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.cashFlow.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.accountsPayable.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.accountsReceivable.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.animal.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.inventoryItem.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.bankAccount.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.location.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.employee.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.serviceProvider.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.supplier.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.buyer.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    await prisma.property.deleteMany({
+      where: { company: testCompanyFilter },
+    });
+  } catch {
+    // Ignore
   }
 
   try {
@@ -172,62 +387,29 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
           { email: { contains: 'duplicate' } },
           { email: { contains: 'company' } },
           { email: { contains: 'trial' } },
+          { email: { contains: 'regular' } },
+          { email: { contains: 'suppliers' } },
+          { email: { contains: 'sales' } },
+          { email: { contains: 'weighings' } },
+          { email: { contains: 'deaths' } },
+          { email: { contains: 'breedings' } },
+          { email: { contains: 'animals' } },
         ],
       },
     });
   } catch {
-    console.log('User table not found, skipping cleanup');
-  }
-
-  try {
-    await prisma.property.deleteMany({
-      where: {
-        company: {
-          OR: [
-            { companyName: { contains: 'Test' } },
-            { companyName: { contains: 'E2E' } },
-            { email: { contains: 'test' } },
-            { email: { contains: 'registration' } },
-            { email: { contains: 'company' } },
-          ],
-        },
-      },
-    });
-  } catch {
-    console.log('Property table not found, skipping cleanup');
+    // Ignore
   }
 
   try {
     await prisma.company.deleteMany({
-      where: {
-        OR: [
-          { companyName: { contains: 'Test' } },
-          { companyName: { contains: 'E2E' } },
-          { companyName: { contains: 'First' } },
-          { companyName: { contains: 'Second' } },
-          { companyName: { contains: 'Another' } },
-          { companyName: { contains: 'Other' } },
-          { companyName: { contains: 'Trial' } },
-          { companyName: { contains: 'Registration' } },
-          { companyName: { contains: 'Update' } },
-          { companyName: { contains: 'Info' } },
-          { companyName: { contains: 'Existing' } },
-          { email: { contains: 'test' } },
-          { email: { contains: 'registration' } },
-          { email: { contains: 'company' } },
-          { email: { contains: 'trial' } },
-          { email: { contains: 'update' } },
-          { email: { contains: 'info' } },
-          { email: { contains: 'existing' } },
-        ],
-      },
+      where: testCompanyFilter,
     });
   } catch {
-    console.log('Company table not found, skipping cleanup');
+    // Ignore
   }
 
   try {
-    // Clean up plans created during testing
     await prisma.plan.deleteMany({
       where: {
         OR: [
@@ -237,7 +419,7 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
       },
     });
   } catch {
-    console.log('Plan table not found, skipping cleanup');
+    // Ignore
   }
 }
 

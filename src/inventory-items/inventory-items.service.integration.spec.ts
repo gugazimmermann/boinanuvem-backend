@@ -113,7 +113,7 @@ describeOrSkip('InventoryItemsService Integration Tests', () => {
       });
 
       await expect(
-        service.create(testUser.id, {
+        service.create(context.testUser.id, {
           code: 'INV003',
           name: 'Second Item',
           category: InventoryItemCategory.FEED,
@@ -182,7 +182,7 @@ describeOrSkip('InventoryItemsService Integration Tests', () => {
         propertyIds: [context.testProperty.id],
       });
 
-      const result = await service.findOne(testUser.id, created.id);
+      const result = await service.findOne(context.testUser.id, created.id);
 
       expect(result).toBeDefined();
       expect(result.id).toBe(created.id);

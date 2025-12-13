@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   setupE2ETest,
   teardownE2ETest,
@@ -34,7 +35,10 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         status: AccountsReceivableStatus.UNPAID,
       };
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .post('/accounts-receivable')
         .send(createDto)
         .expect(201);
@@ -58,7 +62,10 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get('/accounts-receivable')
         .expect(200);
 
@@ -78,7 +85,10 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         },
       });
 
-      const response = authenticatedRequest(context.app, context.mainUserToken)
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
         .get(`/accounts-receivable/${transaction.id}`)
         .expect(200);
 
@@ -104,9 +114,9 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         paidAmount: 5000.0,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .put(`/accounts-receivable/${transaction.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send(updateDto)
         .expect(200);
 
@@ -129,9 +139,10 @@ describe('Accounts Receivable Management Flow (e2e)', () => {
         .delete(`/accounts-receivable/${transaction.id}`)
         .expect(200);
 
-      const deletedTransaction = await prisma.accountsReceivable.findUnique({
-        where: { id: transaction.id },
-      });
+      const deletedTransaction =
+        await context.prisma.accountsReceivable.findUnique({
+          where: { id: transaction.id },
+        });
       expect(deletedTransaction?.deletedAt).toBeDefined();
     });
   });
