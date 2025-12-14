@@ -25,6 +25,7 @@ import { SalesModule } from './sales/sales.module';
 import { DeathsModule } from './deaths/deaths.module';
 import { WeighingsModule } from './weighings/weighings.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
+import { InventoryMovementsModule } from './inventory-movements/inventory-movements.module';
 import { BreedingsModule } from './breedings/breedings.module';
 import { SanitaryControlsModule } from './sanitary-controls/sanitary-controls.module';
 import { CashFlowModule } from './cash-flow/cash-flow.module';
@@ -76,6 +77,7 @@ import securityConfig from './common/config/security.config';
     DeathsModule,
     WeighingsModule,
     InventoryItemsModule,
+    InventoryMovementsModule,
     BreedingsModule,
     SanitaryControlsModule,
     CashFlowModule,

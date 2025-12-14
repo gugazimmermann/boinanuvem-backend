@@ -50,13 +50,17 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
   });
 
   describe('POST /sanitary-controls', () => {
-    it('should create a sanitary control record', async () => {
+    it('should create a sanitary control record with appliedMedicines array', async () => {
       const createDto = {
         animalId: testAnimal.id,
         date: '2025-01-15',
-        itemId: testInventoryItem.id,
-        quantity: 10,
-        calculatedDosage: 5.5,
+        appliedMedicines: [
+          {
+            itemId: testInventoryItem.id,
+            quantity: 10,
+            calculatedDosage: 5.5,
+          },
+        ],
         observation: 'Test control',
       };
 
@@ -70,17 +74,96 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
       expect(response.body).toMatchObject({
         animalId: testAnimal.id,
-        itemId: testInventoryItem.id,
-        quantity: 10,
       });
       expect(response.body.id).toBeDefined();
+      expect(Array.isArray(response.body.appliedMedicines)).toBe(true);
+      expect(response.body.appliedMedicines.length).toBe(1);
+      expect(response.body.appliedMedicines[0]).toMatchObject({
+        itemId: testInventoryItem.id,
+        quantity: 10,
+        calculatedDosage: 5.5,
+      });
+    });
+
+    it('should create a sanitary control record with legacy format (backward compatibility)', async () => {
+      const createDto = {
+        animalId: testAnimal.id,
+        date: '2025-01-16',
+        itemId: testInventoryItem.id,
+        quantity: 10,
+        calculatedDosage: 5.5,
+        observation: 'Test control legacy',
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/sanitary-controls')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        animalId: testAnimal.id,
+      });
+      expect(response.body.id).toBeDefined();
+      expect(Array.isArray(response.body.appliedMedicines)).toBe(true);
+      expect(response.body.appliedMedicines.length).toBe(1);
+    });
+
+    it('should create with multiple medicines', async () => {
+      const secondItem = await createTestInventoryItem(context.prisma, {
+        code: 'MED002',
+        name: 'Test Medicine 2',
+        category: 'medicines',
+        unit: 'ml',
+        minimumStock: 10,
+        hasExpiration: false,
+        companyId: context.testCompany.id,
+      });
+
+      const createDto = {
+        animalId: testAnimal.id,
+        date: '2025-01-17',
+        appliedMedicines: [
+          {
+            itemId: testInventoryItem.id,
+            quantity: 10,
+            calculatedDosage: 5.5,
+          },
+          {
+            itemId: secondItem.id,
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      };
+
+      const response = await authenticatedRequest(
+        context.app,
+        context.mainUserToken,
+      )
+        .post('/sanitary-controls')
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body.appliedMedicines.length).toBe(2);
+      expect(response.body.appliedMedicines[0].itemId).toBe(
+        testInventoryItem.id,
+      );
+      expect(response.body.appliedMedicines[1].itemId).toBe(secondItem.id);
     });
 
     it('should create with employees and service providers', async () => {
       const createDto = {
         animalId: testAnimal.id,
-        date: '2025-01-16',
-        itemId: testInventoryItem.id,
+        date: '2025-01-18',
+        appliedMedicines: [
+          {
+            itemId: testInventoryItem.id,
+            quantity: 10,
+          },
+        ],
         employeeIds: [context.testEmployees[0].id],
         serviceProviderIds: [context.testServiceProviders[0].id],
       };
@@ -103,7 +186,12 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
       const createDto = {
         animalId: 'non-existent-id',
         date: '2025-01-15',
-        itemId: testInventoryItem.id,
+        appliedMedicines: [
+          {
+            itemId: testInventoryItem.id,
+            quantity: 10,
+          },
+        ],
       };
 
       await authenticatedRequest(context.app, context.mainUserToken)
@@ -115,12 +203,22 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
   describe('GET /sanitary-controls', () => {
     it('should return all sanitary control records for company', async () => {
-      await context.prisma.sanitaryControl.create({
+      const control = await context.prisma.sanitaryControl.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),
           itemId: testInventoryItem.id,
           companyId: context.testCompany.id,
+        },
+      });
+
+      // Create junction table record
+      await context.prisma.sanitaryControlItem.create({
+        data: {
+          sanitaryControlId: control.id,
+          itemId: testInventoryItem.id,
+          quantity: 10,
+          calculatedDosage: 5.5,
         },
       });
 
@@ -133,6 +231,7 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(1);
+      expect(Array.isArray(response.body[0].appliedMedicines)).toBe(true);
     });
   });
 
@@ -147,6 +246,16 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         },
       });
 
+      // Create junction table record
+      await context.prisma.sanitaryControlItem.create({
+        data: {
+          sanitaryControlId: control.id,
+          itemId: testInventoryItem.id,
+          quantity: 10,
+          calculatedDosage: 5.5,
+        },
+      });
+
       const response = await authenticatedRequest(
         context.app,
         context.mainUserToken,
@@ -155,17 +264,28 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.id).toBe(control.id);
+      expect(Array.isArray(response.body.appliedMedicines)).toBe(true);
     });
   });
 
   describe('GET /sanitary-controls/animal/:animalId', () => {
     it('should return sanitary control records for animal', async () => {
-      await context.prisma.sanitaryControl.create({
+      const control = await context.prisma.sanitaryControl.create({
         data: {
           animalId: testAnimal.id,
           date: new Date('2025-01-15'),
           itemId: testInventoryItem.id,
           companyId: context.testCompany.id,
+        },
+      });
+
+      // Create junction table record
+      await context.prisma.sanitaryControlItem.create({
+        data: {
+          sanitaryControlId: control.id,
+          itemId: testInventoryItem.id,
+          quantity: 10,
+          calculatedDosage: 5.5,
         },
       });
 
@@ -179,6 +299,9 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(
         response.body.every((sc: any) => sc.animalId === testAnimal.id),
+      ).toBe(true);
+      expect(
+        response.body.every((sc: any) => Array.isArray(sc.appliedMedicines)),
       ).toBe(true);
     });
   });
@@ -195,9 +318,25 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         },
       });
 
+      // Create junction table entry
+      await context.prisma.sanitaryControlItem.create({
+        data: {
+          sanitaryControlId: control.id,
+          itemId: testInventoryItem.id,
+          quantity: 10,
+          calculatedDosage: 5.0,
+        },
+      });
+
       const updateDto = {
         observation: 'Updated observation',
-        quantity: 20,
+        appliedMedicines: [
+          {
+            itemId: testInventoryItem.id,
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
       };
 
       const response = await authenticatedRequest(
@@ -209,7 +348,7 @@ describe('Sanitary Controls Management Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body.observation).toBe('Updated observation');
-      expect(response.body.quantity).toBe(20);
+      expect(response.body.appliedMedicines[0].quantity).toBe(20);
     });
   });
 

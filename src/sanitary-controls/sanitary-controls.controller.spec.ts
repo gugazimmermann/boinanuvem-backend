@@ -26,9 +26,16 @@ describe('SanitaryControlsController', () => {
     id: 'sc-1',
     animalId: 'animal-1',
     date: new Date('2025-01-15'),
-    itemId: 'item-1',
-    quantity: 10,
-    calculatedDosage: 5.5,
+    appliedMedicines: [
+      {
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      },
+    ],
+    itemId: 'item-1', // Legacy field
+    quantity: 10, // Legacy field
+    calculatedDosage: 5.5, // Legacy field
     observation: 'Test control',
     companyId: 'company-1',
     employeeIds: [],
@@ -40,9 +47,13 @@ describe('SanitaryControlsController', () => {
   const mockCreateSanitaryControlDto: CreateSanitaryControlDto = {
     animalId: 'animal-1',
     date: '2025-01-15',
-    itemId: 'item-1',
-    quantity: 10,
-    calculatedDosage: 5.5,
+    appliedMedicines: [
+      {
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      },
+    ],
     observation: 'Test control',
   };
 
@@ -100,6 +111,7 @@ describe('SanitaryControlsController', () => {
         mockCreateSanitaryControlDto,
       );
       expect(result).toEqual(mockSanitaryControl);
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
     });
 
     it('should handle NotFoundException when animal not found', async () => {
@@ -124,6 +136,7 @@ describe('SanitaryControlsController', () => {
         mockCurrentUser.id,
       );
       expect(result).toEqual([mockSanitaryControl]);
+      expect(Array.isArray(result[0].appliedMedicines)).toBe(true);
     });
   });
 
@@ -138,6 +151,7 @@ describe('SanitaryControlsController', () => {
         'sc-1',
       );
       expect(result).toEqual(mockSanitaryControl);
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
     });
   });
 
@@ -157,6 +171,7 @@ describe('SanitaryControlsController', () => {
         'animal-1',
       );
       expect(result).toEqual([mockSanitaryControl]);
+      expect(Array.isArray(result[0].appliedMedicines)).toBe(true);
     });
   });
 
@@ -181,6 +196,33 @@ describe('SanitaryControlsController', () => {
         updateDto,
       );
       expect(result).toEqual(updated);
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
+    });
+
+    it('should update with appliedMedicines array', async () => {
+      const updateDtoWithMedicines: UpdateSanitaryControlDto = {
+        appliedMedicines: [
+          {
+            itemId: 'item-2',
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      };
+      const updated = {
+        ...mockSanitaryControl,
+        appliedMedicines: updateDtoWithMedicines.appliedMedicines,
+      };
+      sanitaryControlsService.update.mockResolvedValue(updated);
+
+      const result = await controller.update(
+        mockCurrentUser,
+        'sc-1',
+        updateDtoWithMedicines,
+      );
+
+      expect(result.appliedMedicines.length).toBe(1);
+      expect(result.appliedMedicines[0].itemId).toBe('item-2');
     });
   });
 

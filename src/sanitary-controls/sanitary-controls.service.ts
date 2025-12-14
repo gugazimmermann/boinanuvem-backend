@@ -3,6 +3,8 @@ import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateSanitaryControlDto, UpdateSanitaryControlDto } from './dto';
 
+type DecimalValue = { toNumber(): number } | number | null;
+
 @Injectable()
 export class SanitaryControlsService {
   constructor(private prisma: PrismaService) {}
@@ -10,18 +12,73 @@ export class SanitaryControlsService {
   async create(userId: string, createDto: CreateSanitaryControlDto) {
     const companyId = await this.getUserCompanyId(userId);
 
-    // Validate animal belongs to company
     await this.validateAnimalBelongsToCompany(createDto.animalId, companyId);
 
-    // Validate inventory item if provided
+    const medicinesToProcess = this.extractMedicinesFromCreateDto(createDto);
+    await this.validateMedicines(medicinesToProcess, companyId);
+    await this.validateCreateDtoRelations(createDto, companyId);
+
+    const sanitaryControl = await this.createSanitaryControl(
+      createDto,
+      medicinesToProcess,
+      companyId,
+    );
+
+    await this.createSanitaryControlItems(
+      sanitaryControl.id,
+      medicinesToProcess,
+    );
+
+    const controlWithItems = await this.prisma.sanitaryControl.findUnique({
+      where: { id: sanitaryControl.id },
+      include: {
+        items: true,
+      },
+    });
+
+    return this.transformSanitaryControl(controlWithItems!);
+  }
+
+  private extractMedicinesFromCreateDto(
+    createDto: CreateSanitaryControlDto,
+  ): Array<{ itemId: string; quantity: number; calculatedDosage?: number }> {
+    if (createDto.appliedMedicines && createDto.appliedMedicines.length > 0) {
+      return createDto.appliedMedicines;
+    }
     if (createDto.itemId) {
+      return [
+        {
+          itemId: createDto.itemId,
+          quantity: createDto.quantity ?? 0,
+          ...(createDto.calculatedDosage !== undefined && {
+            calculatedDosage: createDto.calculatedDosage,
+          }),
+        },
+      ];
+    }
+    return [];
+  }
+
+  private async validateMedicines(
+    medicines: Array<{
+      itemId: string;
+      quantity: number;
+      calculatedDosage?: number;
+    }>,
+    companyId: string,
+  ) {
+    for (const medicine of medicines) {
       await this.validateInventoryItemBelongsToCompany(
-        createDto.itemId,
+        medicine.itemId,
         companyId,
       );
     }
+  }
 
-    // Validate employees if provided
+  private async validateCreateDtoRelations(
+    createDto: CreateSanitaryControlDto,
+    companyId: string,
+  ) {
     if (createDto.employeeIds && createDto.employeeIds.length > 0) {
       await this.validateEmployeesBelongToCompany(
         createDto.employeeIds,
@@ -29,7 +86,6 @@ export class SanitaryControlsService {
       );
     }
 
-    // Validate service providers if provided
     if (
       createDto.serviceProviderIds &&
       createDto.serviceProviderIds.length > 0
@@ -39,14 +95,26 @@ export class SanitaryControlsService {
         companyId,
       );
     }
+  }
 
-    const sanitaryControl = await this.prisma.sanitaryControl.create({
+  private async createSanitaryControl(
+    createDto: CreateSanitaryControlDto,
+    medicinesToProcess: Array<{
+      itemId: string;
+      quantity: number;
+      calculatedDosage?: number;
+    }>,
+    companyId: string,
+  ) {
+    const firstMedicine =
+      medicinesToProcess.length > 0 ? medicinesToProcess[0] : null;
+    return await this.prisma.sanitaryControl.create({
       data: {
         animalId: createDto.animalId,
         date: new Date(createDto.date),
-        itemId: createDto.itemId ?? null,
-        quantity: createDto.quantity ?? null,
-        calculatedDosage: createDto.calculatedDosage ?? null,
+        itemId: firstMedicine?.itemId ?? null,
+        quantity: firstMedicine?.quantity ?? null,
+        calculatedDosage: firstMedicine?.calculatedDosage ?? null,
         observation: createDto.observation ?? null,
         companyId,
         employeeIds: createDto.employeeIds
@@ -57,8 +125,26 @@ export class SanitaryControlsService {
           : Prisma.JsonNull,
       },
     });
+  }
 
-    return this.transformSanitaryControl(sanitaryControl);
+  private async createSanitaryControlItems(
+    sanitaryControlId: string,
+    medicinesToProcess: Array<{
+      itemId: string;
+      quantity: number;
+      calculatedDosage?: number;
+    }>,
+  ) {
+    if (medicinesToProcess.length > 0) {
+      await this.prisma.sanitaryControlItem.createMany({
+        data: medicinesToProcess.map((medicine) => ({
+          sanitaryControlId,
+          itemId: medicine.itemId,
+          quantity: medicine.quantity,
+          calculatedDosage: medicine.calculatedDosage ?? null,
+        })),
+      });
+    }
   }
 
   async findAll(userId: string) {
@@ -68,6 +154,9 @@ export class SanitaryControlsService {
       where: {
         companyId,
         deletedAt: null,
+      },
+      include: {
+        items: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -81,8 +170,17 @@ export class SanitaryControlsService {
 
   async findOne(userId: string, id: string) {
     const companyId = await this.getUserCompanyId(userId);
-    const control = await this.findSanitaryControlByIdAndCompany(id, companyId);
-    return this.transformSanitaryControl(control);
+    await this.findSanitaryControlByIdAndCompany(id, companyId);
+
+    // Fetch with items relation
+    const controlWithItems = await this.prisma.sanitaryControl.findUnique({
+      where: { id },
+      include: {
+        items: true,
+      },
+    });
+
+    return this.transformSanitaryControl(controlWithItems!);
   }
 
   async findByAnimalId(userId: string, animalId: string) {
@@ -96,6 +194,9 @@ export class SanitaryControlsService {
         animalId,
         companyId,
         deletedAt: null,
+      },
+      include: {
+        items: true,
       },
       orderBy: {
         date: 'desc',
@@ -115,48 +216,112 @@ export class SanitaryControlsService {
     const companyId = await this.getUserCompanyId(userId);
     await this.findSanitaryControlByIdAndCompany(id, companyId);
 
-    // Validate animal if being updated
     if (updateDto.animalId) {
       await this.validateAnimalBelongsToCompany(updateDto.animalId, companyId);
     }
 
-    // Validate inventory item if being updated
-    if (updateDto.itemId !== undefined) {
-      if (updateDto.itemId) {
-        await this.validateInventoryItemBelongsToCompany(
-          updateDto.itemId,
-          companyId,
-        );
-      }
+    const medicinesToProcess = this.extractMedicinesFromUpdateDto(updateDto);
+    if (medicinesToProcess !== null) {
+      await this.validateMedicines(medicinesToProcess, companyId);
     }
 
-    // Validate employees if being updated
-    if (updateDto.employeeIds !== undefined) {
-      if (updateDto.employeeIds.length > 0) {
-        await this.validateEmployeesBelongToCompany(
-          updateDto.employeeIds,
-          companyId,
-        );
-      }
-    }
-
-    // Validate service providers if being updated
-    if (updateDto.serviceProviderIds !== undefined) {
-      if (updateDto.serviceProviderIds.length > 0) {
-        await this.validateServiceProvidersBelongToCompany(
-          updateDto.serviceProviderIds,
-          companyId,
-        );
-      }
-    }
+    await this.validateUpdateDtoRelations(updateDto, companyId);
 
     const updateData = this.buildUpdateData(updateDto);
-    const updated = await this.prisma.sanitaryControl.update({
+    await this.prisma.sanitaryControl.update({
       where: { id },
       data: updateData,
     });
 
-    return this.transformSanitaryControl(updated);
+    if (medicinesToProcess !== null) {
+      await this.updateSanitaryControlItems(id, medicinesToProcess);
+    }
+
+    const controlWithItems = await this.prisma.sanitaryControl.findUnique({
+      where: { id },
+      include: {
+        items: true,
+      },
+    });
+
+    return this.transformSanitaryControl(controlWithItems!);
+  }
+
+  private extractMedicinesFromUpdateDto(
+    updateDto: UpdateSanitaryControlDto,
+  ): Array<{
+    itemId: string;
+    quantity: number;
+    calculatedDosage?: number;
+  }> | null {
+    if (updateDto.appliedMedicines !== undefined) {
+      return updateDto.appliedMedicines.length > 0
+        ? updateDto.appliedMedicines
+        : [];
+    }
+    if (updateDto.itemId !== undefined) {
+      return updateDto.itemId
+        ? [
+            {
+              itemId: updateDto.itemId,
+              quantity: updateDto.quantity ?? 0,
+              ...(updateDto.calculatedDosage !== undefined && {
+                calculatedDosage: updateDto.calculatedDosage,
+              }),
+            },
+          ]
+        : [];
+    }
+    return null;
+  }
+
+  private async validateUpdateDtoRelations(
+    updateDto: UpdateSanitaryControlDto,
+    companyId: string,
+  ) {
+    if (
+      updateDto.employeeIds !== undefined &&
+      updateDto.employeeIds.length > 0
+    ) {
+      await this.validateEmployeesBelongToCompany(
+        updateDto.employeeIds,
+        companyId,
+      );
+    }
+
+    if (
+      updateDto.serviceProviderIds !== undefined &&
+      updateDto.serviceProviderIds.length > 0
+    ) {
+      await this.validateServiceProvidersBelongToCompany(
+        updateDto.serviceProviderIds,
+        companyId,
+      );
+    }
+  }
+
+  private async updateSanitaryControlItems(
+    sanitaryControlId: string,
+    medicinesToProcess: Array<{
+      itemId: string;
+      quantity: number;
+      calculatedDosage?: number;
+    }>,
+  ) {
+    await this.prisma.sanitaryControlItem.deleteMany({
+      where: { sanitaryControlId },
+    });
+
+    if (medicinesToProcess.length > 0) {
+      await this.prisma.sanitaryControlItem.createMany({
+        data: medicinesToProcess.map((medicine) => ({
+          sanitaryControlId,
+          itemId: medicine.itemId,
+          quantity: medicine.quantity,
+          calculatedDosage: medicine.calculatedDosage ?? null,
+        })),
+      });
+    }
   }
 
   async remove(userId: string, id: string) {
@@ -192,6 +357,9 @@ export class SanitaryControlsService {
         id,
         companyId,
         deletedAt: null,
+      },
+      include: {
+        items: true,
       },
     });
 
@@ -285,26 +453,59 @@ export class SanitaryControlsService {
   ): Record<string, unknown> {
     const data: Record<string, unknown> = {};
 
-    if (updateDto.animalId !== undefined) data.animalId = updateDto.animalId;
-    if (updateDto.date !== undefined) data.date = new Date(updateDto.date);
-    if (updateDto.itemId !== undefined) data.itemId = updateDto.itemId;
-    if (updateDto.quantity !== undefined) data.quantity = updateDto.quantity;
-    if (updateDto.calculatedDosage !== undefined)
-      data.calculatedDosage = updateDto.calculatedDosage;
-    if (updateDto.observation !== undefined)
-      data.observation = updateDto.observation;
-    if (updateDto.employeeIds !== undefined)
-      data.employeeIds =
-        updateDto.employeeIds.length > 0
-          ? JSON.stringify(updateDto.employeeIds)
-          : null;
-    if (updateDto.serviceProviderIds !== undefined)
-      data.serviceProviderIds =
-        updateDto.serviceProviderIds.length > 0
-          ? JSON.stringify(updateDto.serviceProviderIds)
-          : null;
+    this.setIfDefined(data, 'animalId', updateDto.animalId);
+    this.setIfDefined(data, 'observation', updateDto.observation);
+
+    if (updateDto.date !== undefined) {
+      data.date = new Date(updateDto.date);
+    }
+
+    this.setLegacyMedicineFields(data, updateDto);
+
+    if (updateDto.employeeIds !== undefined) {
+      data.employeeIds = this.stringifyArrayIfNotEmpty(updateDto.employeeIds);
+    }
+    if (updateDto.serviceProviderIds !== undefined) {
+      data.serviceProviderIds = this.stringifyArrayIfNotEmpty(
+        updateDto.serviceProviderIds,
+      );
+    }
 
     return data;
+  }
+
+  private setLegacyMedicineFields(
+    data: Record<string, unknown>,
+    updateDto: UpdateSanitaryControlDto,
+  ) {
+    if (updateDto.appliedMedicines === undefined) {
+      this.setIfDefined(data, 'itemId', updateDto.itemId);
+      this.setIfDefined(data, 'quantity', updateDto.quantity);
+      this.setIfDefined(data, 'calculatedDosage', updateDto.calculatedDosage);
+    } else if (updateDto.appliedMedicines.length > 0) {
+      const firstMedicine = updateDto.appliedMedicines[0];
+      data.itemId = firstMedicine.itemId;
+      data.quantity = firstMedicine.quantity;
+      data.calculatedDosage = firstMedicine.calculatedDosage ?? null;
+    } else {
+      data.itemId = null;
+      data.quantity = null;
+      data.calculatedDosage = null;
+    }
+  }
+
+  private setIfDefined(
+    data: Record<string, unknown>,
+    key: string,
+    value: unknown,
+  ) {
+    if (value !== undefined) {
+      data[key] = value;
+    }
+  }
+
+  private stringifyArrayIfNotEmpty(arr: string[]): string | null {
+    return arr.length > 0 ? JSON.stringify(arr) : null;
   }
 
   private transformSanitaryControl(control: {
@@ -312,38 +513,32 @@ export class SanitaryControlsService {
     animalId: string;
     date: Date;
     itemId: string | null;
-    quantity: { toNumber(): number } | number | null;
-    calculatedDosage: { toNumber(): number } | number | null;
+    quantity: DecimalValue;
+    calculatedDosage: DecimalValue;
     observation: string | null;
     companyId: string;
     employeeIds: Prisma.JsonValue;
     serviceProviderIds: Prisma.JsonValue;
     createdAt: Date;
     updatedAt: Date;
+    items?: Array<{
+      id: string;
+      itemId: string;
+      quantity: { toNumber(): number } | number;
+      calculatedDosage: { toNumber(): number } | number | null;
+    }>;
   }) {
-    let quantityValue: number | undefined;
-    if (control.quantity) {
-      quantityValue =
-        typeof control.quantity === 'object'
-          ? control.quantity.toNumber()
-          : control.quantity;
-    }
-
-    let calculatedDosageValue: number | undefined;
-    if (control.calculatedDosage) {
-      calculatedDosageValue =
-        typeof control.calculatedDosage === 'object'
-          ? control.calculatedDosage.toNumber()
-          : control.calculatedDosage;
-    }
+    const appliedMedicines = this.buildAppliedMedicines(control);
+    const legacyFields = this.extractLegacyFields(control);
 
     return {
       id: control.id,
       animalId: control.animalId,
       date: control.date,
+      appliedMedicines,
       itemId: control.itemId,
-      quantity: quantityValue,
-      calculatedDosage: calculatedDosageValue,
+      quantity: legacyFields.quantity,
+      calculatedDosage: legacyFields.calculatedDosage,
       observation: control.observation,
       companyId: control.companyId,
       employeeIds: control.employeeIds
@@ -355,5 +550,56 @@ export class SanitaryControlsService {
       createdAt: control.createdAt,
       updatedAt: control.updatedAt,
     };
+  }
+
+  private buildAppliedMedicines(control: {
+    items?: Array<{
+      id: string;
+      itemId: string;
+      quantity: { toNumber(): number } | number;
+      calculatedDosage: { toNumber(): number } | number | null;
+    }>;
+    itemId: string | null;
+    quantity: DecimalValue;
+    calculatedDosage: DecimalValue;
+  }): Array<{ itemId: string; quantity: number; calculatedDosage?: number }> {
+    if (control.items && control.items.length > 0) {
+      return control.items.map((item) => ({
+        itemId: item.itemId,
+        quantity: this.toNumber(item.quantity),
+        ...(item.calculatedDosage && {
+          calculatedDosage: this.toNumber(item.calculatedDosage),
+        }),
+      }));
+    }
+    if (control.itemId && control.quantity != null) {
+      const quantityValue = this.toNumber(control.quantity);
+      return [
+        {
+          itemId: control.itemId,
+          quantity: quantityValue,
+          ...(control.calculatedDosage && {
+            calculatedDosage: this.toNumber(control.calculatedDosage),
+          }),
+        },
+      ];
+    }
+    return [];
+  }
+
+  private extractLegacyFields(control: {
+    quantity: DecimalValue;
+    calculatedDosage: DecimalValue;
+  }): { quantity: number | undefined; calculatedDosage: number | undefined } {
+    return {
+      quantity: control.quantity ? this.toNumber(control.quantity) : undefined,
+      calculatedDosage: control.calculatedDosage
+        ? this.toNumber(control.calculatedDosage)
+        : undefined,
+    };
+  }
+
+  private toNumber(value: { toNumber(): number } | number): number {
+    return typeof value === 'object' ? value.toNumber() : value;
   }
 }

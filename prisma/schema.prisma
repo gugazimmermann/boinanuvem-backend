@@ -721,6 +721,7 @@ model InventoryItem {
   properties       InventoryItemProperty[]
   movements        InventoryMovement[]
   sanitaryControls SanitaryControl[]       @relation("SanitaryControlInventoryItem")
+  sanitaryControlItems SanitaryControlItem[]
 
   @@unique([companyId, code], name: "unique_inventory_item_code_per_company")
   @@index([companyId])
@@ -814,9 +815,9 @@ model SanitaryControl {
   id                 String    @id @default(cuid())
   animalId           String
   date               DateTime
-  itemId             String? // Inventory item ID (medicine, vaccine, etc.)
-  quantity           Decimal?  @db.Decimal(10, 2)
-  calculatedDosage   Decimal?  @db.Decimal(10, 2)
+  itemId             String? // Inventory item ID (medicine, vaccine, etc.) - Legacy field for backward compatibility
+  quantity           Decimal?  @db.Decimal(10, 2) // Legacy field for backward compatibility
+  calculatedDosage   Decimal?  @db.Decimal(10, 2) // Legacy field for backward compatibility
   observation        String?
   companyId          String
   employeeIds        Json? // Store as JSON array: string[]
@@ -826,15 +827,33 @@ model SanitaryControl {
   updatedAt          DateTime  @updatedAt
 
   // Relations
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  animal        Animal         @relation(fields: [animalId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem? @relation("SanitaryControlInventoryItem", fields: [itemId], references: [id], onDelete: SetNull)
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal        Animal              @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem?      @relation("SanitaryControlInventoryItem", fields: [itemId], references: [id], onDelete: SetNull)
+  items         SanitaryControlItem[] // New junction table for multiple medicines
 
   @@index([companyId])
   @@index([animalId])
   @@index([itemId])
   @@index([deletedAt])
   @@map("sanitary_controls")
+}
+
+model SanitaryControlItem {
+  id                String    @id @default(cuid())
+  sanitaryControlId String
+  itemId            String
+  quantity          Decimal   @db.Decimal(10, 2)
+  calculatedDosage  Decimal?  @db.Decimal(10, 2)
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  sanitaryControl SanitaryControl @relation(fields: [sanitaryControlId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([sanitaryControlId])
+  @@index([itemId])
+  @@map("sanitary_control_items")
 }
 
 model CashFlow {

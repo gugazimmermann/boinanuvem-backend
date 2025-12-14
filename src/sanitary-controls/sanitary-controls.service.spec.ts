@@ -23,9 +23,9 @@ describe('SanitaryControlsService', () => {
     id: 'sc-1',
     animalId: 'animal-1',
     date: new Date('2025-01-15'),
-    itemId: 'item-1',
-    quantity: 10,
-    calculatedDosage: 5.5,
+    itemId: 'item-1', // Legacy field
+    quantity: 10, // Legacy field
+    calculatedDosage: 5.5, // Legacy field
     observation: 'Test control',
     companyId: 'company-1',
     employeeIds: null,
@@ -33,14 +33,27 @@ describe('SanitaryControlsService', () => {
     deletedAt: null,
     createdAt: new Date('2025-01-15'),
     updatedAt: new Date('2025-01-15'),
+    items: [
+      // Junction table relation
+      {
+        id: 'sci-1',
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      },
+    ],
   };
 
   const mockCreateSanitaryControlDto: CreateSanitaryControlDto = {
     animalId: 'animal-1',
     date: '2025-01-15',
-    itemId: 'item-1',
-    quantity: 10,
-    calculatedDosage: 5.5,
+    appliedMedicines: [
+      {
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      },
+    ],
     observation: 'Test control',
   };
 
@@ -64,8 +77,13 @@ describe('SanitaryControlsService', () => {
       sanitaryControl: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      sanitaryControlItem: {
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
 
@@ -89,7 +107,7 @@ describe('SanitaryControlsService', () => {
   });
 
   describe('create', () => {
-    it('should create a sanitary control record successfully', async () => {
+    it('should create a sanitary control record with appliedMedicines array', async () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
       prismaService.inventoryItem.findFirst.mockResolvedValue({
@@ -100,6 +118,12 @@ describe('SanitaryControlsService', () => {
       prismaService.sanitaryControl.create.mockResolvedValue(
         mockSanitaryControl,
       );
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        mockSanitaryControl,
+      );
 
       const result = await service.create(
         mockUser.id,
@@ -107,8 +131,114 @@ describe('SanitaryControlsService', () => {
       );
 
       expect(prismaService.sanitaryControl.create).toHaveBeenCalled();
+      expect(prismaService.sanitaryControlItem.createMany).toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(result.id).toBe('sc-1');
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
+      expect(result.appliedMedicines.length).toBe(1);
+    });
+
+    it('should create with multiple medicines', async () => {
+      const dtoWithMultipleMedicines: CreateSanitaryControlDto = {
+        animalId: 'animal-1',
+        date: '2025-01-15',
+        appliedMedicines: [
+          {
+            itemId: 'item-1',
+            quantity: 10,
+            calculatedDosage: 5.5,
+          },
+          {
+            itemId: 'item-2',
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.inventoryItem.findFirst
+        .mockResolvedValueOnce({
+          id: 'item-1',
+          companyId: 'company-1',
+          deletedAt: null,
+        })
+        .mockResolvedValueOnce({
+          id: 'item-2',
+          companyId: 'company-1',
+          deletedAt: null,
+        });
+      prismaService.sanitaryControl.create.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 2,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        items: [
+          {
+            id: 'sci-1',
+            itemId: 'item-1',
+            quantity: 10,
+            calculatedDosage: 5.5,
+          },
+          {
+            id: 'sci-2',
+            itemId: 'item-2',
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      });
+
+      const result = await service.create(
+        mockUser.id,
+        dtoWithMultipleMedicines,
+      );
+
+      expect(prismaService.sanitaryControlItem.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({ itemId: 'item-1' }),
+            expect.objectContaining({ itemId: 'item-2' }),
+          ]),
+        }),
+      );
+      expect(result.appliedMedicines.length).toBe(2);
+    });
+
+    it('should create with legacy itemId format (backward compatibility)', async () => {
+      const legacyDto: CreateSanitaryControlDto = {
+        animalId: 'animal-1',
+        date: '2025-01-15',
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.inventoryItem.findFirst.mockResolvedValue({
+        id: 'item-1',
+        companyId: 'company-1',
+        deletedAt: null,
+      });
+      prismaService.sanitaryControl.create.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        mockSanitaryControl,
+      );
+
+      const result = await service.create(mockUser.id, legacyDto);
+
+      expect(prismaService.sanitaryControlItem.createMany).toHaveBeenCalled();
+      expect(result.appliedMedicines.length).toBe(1);
     });
 
     it('should throw NotFoundException if animal not found', async () => {
@@ -126,8 +256,16 @@ describe('SanitaryControlsService', () => {
       prismaService.sanitaryControl.create.mockResolvedValue({
         ...mockSanitaryControl,
         itemId: null,
-        employeeIds: null,
-        serviceProviderIds: null,
+        quantity: null,
+        calculatedDosage: null,
+        items: [],
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        itemId: null,
+        quantity: null,
+        calculatedDosage: null,
+        items: [],
       });
 
       const dtoWithoutOptionals: CreateSanitaryControlDto = {
@@ -135,12 +273,16 @@ describe('SanitaryControlsService', () => {
         date: '2025-01-15',
       };
 
-      await service.create(mockUser.id, dtoWithoutOptionals);
+      const result = await service.create(mockUser.id, dtoWithoutOptionals);
 
       expect(prismaService.inventoryItem.findFirst).not.toHaveBeenCalled();
       expect(prismaService.employee.findMany).not.toHaveBeenCalled();
       expect(prismaService.serviceProvider.findMany).not.toHaveBeenCalled();
       expect(prismaService.sanitaryControl.create).toHaveBeenCalled();
+      expect(
+        prismaService.sanitaryControlItem.createMany,
+      ).not.toHaveBeenCalled();
+      expect(result.appliedMedicines).toEqual([]);
     });
 
     it('should validate employees if provided', async () => {
@@ -158,6 +300,13 @@ describe('SanitaryControlsService', () => {
       });
       prismaService.employee.findMany.mockResolvedValue(mockEmployees);
       prismaService.sanitaryControl.create.mockResolvedValue({
+        ...mockSanitaryControl,
+        employeeIds: JSON.stringify(['employee-1', 'employee-2']),
+      });
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
         ...mockSanitaryControl,
         employeeIds: JSON.stringify(['employee-1', 'employee-2']),
       });
@@ -204,6 +353,13 @@ describe('SanitaryControlsService', () => {
         ...mockSanitaryControl,
         serviceProviderIds: JSON.stringify(['sp-1']),
       });
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        serviceProviderIds: JSON.stringify(['sp-1']),
+      });
 
       const dtoWithServiceProviders: CreateSanitaryControlDto = {
         ...mockCreateSanitaryControlDto,
@@ -232,7 +388,7 @@ describe('SanitaryControlsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all sanitary control records for company', async () => {
+    it('should return all sanitary control records for company with appliedMedicines', async () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.sanitaryControl.findMany.mockResolvedValue([
         mockSanitaryControl,
@@ -245,18 +401,25 @@ describe('SanitaryControlsService', () => {
           companyId: 'company-1',
           deletedAt: null,
         },
+        include: {
+          items: true,
+        },
         orderBy: {
           createdAt: 'desc',
         },
       });
       expect(result).toHaveLength(1);
+      expect(Array.isArray(result[0].appliedMedicines)).toBe(true);
     });
   });
 
   describe('findOne', () => {
-    it('should return sanitary control record by ID', async () => {
+    it('should return sanitary control record by ID with appliedMedicines', async () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
         mockSanitaryControl,
       );
 
@@ -264,6 +427,8 @@ describe('SanitaryControlsService', () => {
 
       expect(result).toBeDefined();
       expect(result.id).toBe('sc-1');
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
+      expect(result.appliedMedicines.length).toBe(1);
     });
 
     it('should throw NotFoundException if record not found', async () => {
@@ -277,7 +442,7 @@ describe('SanitaryControlsService', () => {
   });
 
   describe('findByAnimalId', () => {
-    it('should return sanitary control records for animal', async () => {
+    it('should return sanitary control records for animal with appliedMedicines', async () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
       prismaService.sanitaryControl.findMany.mockResolvedValue([
@@ -287,6 +452,7 @@ describe('SanitaryControlsService', () => {
       const result = await service.findByAnimalId(mockUser.id, 'animal-1');
 
       expect(result).toHaveLength(1);
+      expect(Array.isArray(result[0].appliedMedicines)).toBe(true);
     });
   });
 
@@ -297,6 +463,10 @@ describe('SanitaryControlsService', () => {
         mockSanitaryControl,
       );
       prismaService.sanitaryControl.update.mockResolvedValue({
+        ...mockSanitaryControl,
+        observation: 'Updated observation',
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
         ...mockSanitaryControl,
         observation: 'Updated observation',
       });
@@ -311,7 +481,87 @@ describe('SanitaryControlsService', () => {
       expect(result.observation).toBe('Updated observation');
     });
 
-    it('should update with all optional fields', async () => {
+    it('should update with appliedMedicines array', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.inventoryItem.findFirst.mockResolvedValue({
+        id: 'item-2',
+        companyId: 'company-1',
+        deletedAt: null,
+      });
+      prismaService.sanitaryControl.update.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControlItem.deleteMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        items: [
+          {
+            id: 'sci-2',
+            itemId: 'item-2',
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      });
+
+      const updateDto: UpdateSanitaryControlDto = {
+        appliedMedicines: [
+          {
+            itemId: 'item-2',
+            quantity: 20,
+            calculatedDosage: 10.0,
+          },
+        ],
+      };
+
+      const result = await service.update(mockUser.id, 'sc-1', updateDto);
+
+      expect(prismaService.sanitaryControlItem.deleteMany).toHaveBeenCalled();
+      expect(prismaService.sanitaryControlItem.createMany).toHaveBeenCalled();
+      expect(result.appliedMedicines[0].itemId).toBe('item-2');
+    });
+
+    it('should update with empty appliedMedicines array', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControl.update.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControlItem.deleteMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        items: [],
+        itemId: null,
+        quantity: null,
+        calculatedDosage: null,
+      });
+
+      const updateDto: UpdateSanitaryControlDto = {
+        appliedMedicines: [],
+      };
+
+      const result = await service.update(mockUser.id, 'sc-1', updateDto);
+
+      expect(prismaService.sanitaryControlItem.deleteMany).toHaveBeenCalled();
+      expect(
+        prismaService.sanitaryControlItem.createMany,
+      ).not.toHaveBeenCalled();
+      expect(result.appliedMedicines).toEqual([]);
+    });
+
+    it('should update with all optional fields using legacy format', async () => {
       const mockEmployees = [{ id: 'employee-1', companyId: 'company-1' }];
       const mockServiceProviders = [{ id: 'sp-1', companyId: 'company-1' }];
 
@@ -332,6 +582,15 @@ describe('SanitaryControlsService', () => {
       prismaService.sanitaryControl.update.mockResolvedValue(
         mockSanitaryControl,
       );
+      prismaService.sanitaryControlItem.deleteMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControlItem.createMany.mockResolvedValue({
+        count: 1,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        mockSanitaryControl,
+      );
 
       const updateDto: UpdateSanitaryControlDto = {
         animalId: 'animal-1',
@@ -347,6 +606,7 @@ describe('SanitaryControlsService', () => {
       await service.update(mockUser.id, 'sc-1', updateDto);
 
       expect(prismaService.sanitaryControl.update).toHaveBeenCalled();
+      expect(prismaService.sanitaryControlItem.createMany).toHaveBeenCalled();
     });
 
     it('should update with itemId set to null', async () => {
@@ -357,6 +617,11 @@ describe('SanitaryControlsService', () => {
       prismaService.sanitaryControl.update.mockResolvedValue({
         ...mockSanitaryControl,
         itemId: null,
+      });
+      prismaService.sanitaryControl.findUnique.mockResolvedValue({
+        ...mockSanitaryControl,
+        itemId: null,
+        items: [],
       });
 
       const updateDto: UpdateSanitaryControlDto = {
@@ -377,6 +642,9 @@ describe('SanitaryControlsService', () => {
       prismaService.sanitaryControl.update.mockResolvedValue(
         mockSanitaryControl,
       );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        mockSanitaryControl,
+      );
 
       const updateDto: UpdateSanitaryControlDto = {
         employeeIds: [],
@@ -394,6 +662,9 @@ describe('SanitaryControlsService', () => {
         mockSanitaryControl,
       );
       prismaService.sanitaryControl.update.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
         mockSanitaryControl,
       );
 
@@ -429,14 +700,58 @@ describe('SanitaryControlsService', () => {
   });
 
   describe('transform methods', () => {
+    it('should transform with junction table items', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        mockSanitaryControl,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        mockSanitaryControl,
+      );
+
+      const result = await service.findOne(mockUser.id, 'sc-1');
+
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
+      expect(result.appliedMedicines.length).toBe(1);
+      expect(result.appliedMedicines[0]).toMatchObject({
+        itemId: 'item-1',
+        quantity: 10,
+        calculatedDosage: 5.5,
+      });
+    });
+
+    it('should fallback to legacy fields if no items in junction table', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      const controlWithLegacyOnly = {
+        ...mockSanitaryControl,
+        items: [],
+      };
+      prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        controlWithLegacyOnly,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
+        controlWithLegacyOnly,
+      );
+
+      const result = await service.findOne(mockUser.id, 'sc-1');
+
+      expect(Array.isArray(result.appliedMedicines)).toBe(true);
+      expect(result.appliedMedicines.length).toBe(1);
+      expect(result.appliedMedicines[0].itemId).toBe('item-1');
+    });
+
     it('should transform with null JSON fields', async () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       const controlWithNulls = {
         ...mockSanitaryControl,
         employeeIds: null,
         serviceProviderIds: null,
+        items: [],
       };
       prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        controlWithNulls,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
         controlWithNulls,
       );
 
@@ -454,6 +769,9 @@ describe('SanitaryControlsService', () => {
         serviceProviderIds: JSON.stringify(['sp-1']),
       };
       prismaService.sanitaryControl.findFirst.mockResolvedValue(
+        controlWithJson,
+      );
+      prismaService.sanitaryControl.findUnique.mockResolvedValue(
         controlWithJson,
       );
 
