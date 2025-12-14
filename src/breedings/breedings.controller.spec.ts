@@ -53,8 +53,15 @@ describe('BreedingsController', () => {
       findAll: jest.fn(),
       findOne: jest.fn(),
       findByAnimalId: jest.fn(),
+      findUnconfirmed: jest.fn(),
+      getNextAttemptNumber: jest.fn(),
+      isAnimalPregnant: jest.fn(),
+      getMostRecentConfirmedBreeding: jest.fn(),
+      findByPropertyId: jest.fn(),
+      getPregnantAnimalsByProperty: jest.fn(),
       update: jest.fn(),
       confirm: jest.fn(),
+      unconfirmMostRecentBreeding: jest.fn(),
       remove: jest.fn(),
     };
 
@@ -237,6 +244,272 @@ describe('BreedingsController', () => {
 
       await expect(
         controller.confirm(mockCurrentUser, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findUnconfirmed', () => {
+    it('should return unconfirmed breedings successfully', async () => {
+      breedingsService.findUnconfirmed.mockResolvedValue([mockBreeding]);
+
+      const result = await controller.findUnconfirmed(mockCurrentUser);
+
+      expect(breedingsService.findUnconfirmed).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+      );
+      expect(result).toEqual([mockBreeding]);
+    });
+
+    it('should return empty array when no unconfirmed breedings exist', async () => {
+      breedingsService.findUnconfirmed.mockResolvedValue([]);
+
+      const result = await controller.findUnconfirmed(mockCurrentUser);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getNextAttemptNumber', () => {
+    it('should return next attempt number successfully', async () => {
+      const mockResponse = { nextAttemptNumber: 2 };
+      breedingsService.getNextAttemptNumber.mockResolvedValue(mockResponse);
+
+      const result = await controller.getNextAttemptNumber(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(breedingsService.getNextAttemptNumber).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        'animal-1',
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should handle NotFoundException when animal not found', async () => {
+      const error = new NotFoundException(
+        'Animal not found or does not belong to your company',
+      );
+      breedingsService.getNextAttemptNumber.mockRejectedValue(error);
+
+      await expect(
+        controller.getNextAttemptNumber(mockCurrentUser, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('isAnimalPregnant', () => {
+    it('should return pregnancy status successfully', async () => {
+      const mockResponse = { isPregnant: true };
+      breedingsService.isAnimalPregnant.mockResolvedValue(mockResponse);
+
+      const result = await controller.isAnimalPregnant(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(breedingsService.isAnimalPregnant).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        'animal-1',
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should return false when animal is not pregnant', async () => {
+      const mockResponse = { isPregnant: false };
+      breedingsService.isAnimalPregnant.mockResolvedValue(mockResponse);
+
+      const result = await controller.isAnimalPregnant(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(result.isPregnant).toBe(false);
+    });
+
+    it('should handle NotFoundException when animal not found', async () => {
+      const error = new NotFoundException(
+        'Animal not found or does not belong to your company',
+      );
+      breedingsService.isAnimalPregnant.mockRejectedValue(error);
+
+      await expect(
+        controller.isAnimalPregnant(mockCurrentUser, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getMostRecentConfirmedBreeding', () => {
+    it('should return most recent confirmed breeding successfully', async () => {
+      const confirmedBreeding = { ...mockBreeding, confirmed: true };
+      breedingsService.getMostRecentConfirmedBreeding.mockResolvedValue(
+        confirmedBreeding,
+      );
+
+      const result = await controller.getMostRecentConfirmedBreeding(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(
+        breedingsService.getMostRecentConfirmedBreeding,
+      ).toHaveBeenCalledWith(mockCurrentUser.id, 'animal-1');
+      expect(result).toEqual(confirmedBreeding);
+    });
+
+    it('should return null when no confirmed breeding exists', async () => {
+      breedingsService.getMostRecentConfirmedBreeding.mockResolvedValue(null);
+
+      const result = await controller.getMostRecentConfirmedBreeding(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle NotFoundException when animal not found', async () => {
+      const error = new NotFoundException(
+        'Animal not found or does not belong to your company',
+      );
+      breedingsService.getMostRecentConfirmedBreeding.mockRejectedValue(error);
+
+      await expect(
+        controller.getMostRecentConfirmedBreeding(
+          mockCurrentUser,
+          'non-existent-id',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findByPropertyId', () => {
+    it('should return breedings by property successfully', async () => {
+      breedingsService.findByPropertyId.mockResolvedValue([mockBreeding]);
+
+      const result = await controller.findByPropertyId(
+        mockCurrentUser,
+        'property-1',
+      );
+
+      expect(breedingsService.findByPropertyId).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        'property-1',
+      );
+      expect(result).toEqual([mockBreeding]);
+    });
+
+    it('should return empty array when no breedings exist for property', async () => {
+      breedingsService.findByPropertyId.mockResolvedValue([]);
+
+      const result = await controller.findByPropertyId(
+        mockCurrentUser,
+        'property-1',
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle NotFoundException when property not found', async () => {
+      const error = new NotFoundException(
+        'Property not found or does not belong to your company',
+      );
+      breedingsService.findByPropertyId.mockRejectedValue(error);
+
+      await expect(
+        controller.findByPropertyId(mockCurrentUser, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPregnantAnimalsByProperty', () => {
+    it('should return pregnant animal IDs successfully', async () => {
+      const mockResponse = { animalIds: ['animal-1', 'animal-2'] };
+      breedingsService.getPregnantAnimalsByProperty.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await controller.getPregnantAnimalsByProperty(
+        mockCurrentUser,
+        'property-1',
+      );
+
+      expect(
+        breedingsService.getPregnantAnimalsByProperty,
+      ).toHaveBeenCalledWith(mockCurrentUser.id, 'property-1');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should return empty array when no pregnant animals exist', async () => {
+      const mockResponse = { animalIds: [] };
+      breedingsService.getPregnantAnimalsByProperty.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await controller.getPregnantAnimalsByProperty(
+        mockCurrentUser,
+        'property-1',
+      );
+
+      expect(result.animalIds).toEqual([]);
+    });
+
+    it('should handle NotFoundException when property not found', async () => {
+      const error = new NotFoundException(
+        'Property not found or does not belong to your company',
+      );
+      breedingsService.getPregnantAnimalsByProperty.mockRejectedValue(error);
+
+      await expect(
+        controller.getPregnantAnimalsByProperty(
+          mockCurrentUser,
+          'non-existent-id',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('unconfirmMostRecentBreeding', () => {
+    it('should unconfirm most recent breeding successfully', async () => {
+      const unconfirmedBreeding = { ...mockBreeding, confirmed: false };
+      breedingsService.unconfirmMostRecentBreeding.mockResolvedValue(
+        unconfirmedBreeding,
+      );
+
+      const result = await controller.unconfirmMostRecentBreeding(
+        mockCurrentUser,
+        'animal-1',
+      );
+
+      expect(breedingsService.unconfirmMostRecentBreeding).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        'animal-1',
+      );
+      expect(result.confirmed).toBe(false);
+    });
+
+    it('should handle NotFoundException when animal not found', async () => {
+      const error = new NotFoundException(
+        'Animal not found or does not belong to your company',
+      );
+      breedingsService.unconfirmMostRecentBreeding.mockRejectedValue(error);
+
+      await expect(
+        controller.unconfirmMostRecentBreeding(
+          mockCurrentUser,
+          'non-existent-id',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle NotFoundException when no confirmed breeding exists', async () => {
+      const error = new NotFoundException(
+        'No confirmed breeding found for this animal',
+      );
+      breedingsService.unconfirmMostRecentBreeding.mockRejectedValue(error);
+
+      await expect(
+        controller.unconfirmMostRecentBreeding(mockCurrentUser, 'animal-1'),
       ).rejects.toThrow(NotFoundException);
     });
   });

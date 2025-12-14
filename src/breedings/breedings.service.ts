@@ -170,6 +170,241 @@ export class BreedingsService {
     });
   }
 
+  async findUnconfirmed(userId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    const breedings = await this.prisma.breeding.findMany({
+      where: {
+        companyId,
+        confirmed: false,
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return breedings.map((breeding) => this.transformBreeding(breeding));
+  }
+
+  async getNextAttemptNumber(userId: string, animalId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate animal belongs to company
+    await this.validateAnimalBelongsToCompany(animalId, companyId);
+
+    // Find most recent birth where animal is mother
+    const mostRecentBirth = await this.prisma.birth.findFirst({
+      where: {
+        motherId: animalId,
+        companyId,
+        deletedAt: null,
+      },
+      orderBy: {
+        birthDate: 'desc',
+      },
+      select: {
+        birthDate: true,
+      },
+    });
+
+    // Get all AI breedings for the animal
+    const aiBreedings = await this.prisma.breeding.findMany({
+      where: {
+        animalId,
+        companyId,
+        method: 'artificial_insemination',
+        deletedAt: null,
+      },
+      select: {
+        attemptNumber: true,
+        date: true,
+      },
+    });
+
+    // If no birth, use all AI breedings
+    if (!mostRecentBirth) {
+      if (aiBreedings.length === 0) {
+        return { nextAttemptNumber: 1 };
+      }
+      const maxAttempt = Math.max(
+        ...aiBreedings.map((b) => b.attemptNumber ?? 0),
+      );
+      return { nextAttemptNumber: maxAttempt + 1 };
+    }
+
+    // Filter AI breedings after most recent birth
+    const aiBreedingsAfterBirth = aiBreedings.filter((b) => {
+      const breedingDate = new Date(b.date).getTime();
+      const birthDate = new Date(mostRecentBirth.birthDate).getTime();
+      return breedingDate > birthDate;
+    });
+
+    if (aiBreedingsAfterBirth.length === 0) {
+      return { nextAttemptNumber: 1 };
+    }
+
+    const maxAttempt = Math.max(
+      ...aiBreedingsAfterBirth.map((b) => b.attemptNumber ?? 0),
+    );
+    return { nextAttemptNumber: maxAttempt + 1 };
+  }
+
+  async isAnimalPregnant(userId: string, animalId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate animal belongs to company
+    await this.validateAnimalBelongsToCompany(animalId, companyId);
+
+    const confirmedBreeding = await this.prisma.breeding.findFirst({
+      where: {
+        animalId,
+        companyId,
+        confirmed: true,
+        deletedAt: null,
+      },
+    });
+
+    return { isPregnant: !!confirmedBreeding };
+  }
+
+  async getMostRecentConfirmedBreeding(userId: string, animalId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate animal belongs to company
+    await this.validateAnimalBelongsToCompany(animalId, companyId);
+
+    const breeding = await this.prisma.breeding.findFirst({
+      where: {
+        animalId,
+        companyId,
+        confirmed: true,
+        deletedAt: null,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    return breeding ? this.transformBreeding(breeding) : null;
+  }
+
+  async findByPropertyId(userId: string, propertyId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate property belongs to company
+    await this.validatePropertyBelongsToCompany(propertyId, companyId);
+
+    // Get all animals for the property
+    const animals = await this.prisma.animal.findMany({
+      where: {
+        propertyId,
+        companyId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const animalIds = animals.map((a) => a.id);
+
+    if (animalIds.length === 0) {
+      return [];
+    }
+
+    // Get breedings for those animals
+    const breedings = await this.prisma.breeding.findMany({
+      where: {
+        animalId: { in: animalIds },
+        companyId,
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return breedings.map((breeding) => this.transformBreeding(breeding));
+  }
+
+  async getPregnantAnimalsByProperty(userId: string, propertyId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate property belongs to company
+    await this.validatePropertyBelongsToCompany(propertyId, companyId);
+
+    // Get all animals for the property
+    const animals = await this.prisma.animal.findMany({
+      where: {
+        propertyId,
+        companyId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const animalIds = animals.map((a) => a.id);
+
+    if (animalIds.length === 0) {
+      return { animalIds: [] };
+    }
+
+    // Get confirmed breedings for those animals
+    const confirmedBreedings = await this.prisma.breeding.findMany({
+      where: {
+        animalId: { in: animalIds },
+        companyId,
+        confirmed: true,
+        deletedAt: null,
+      },
+      select: {
+        animalId: true,
+      },
+      distinct: ['animalId'],
+    });
+
+    const uniqueAnimalIds = confirmedBreedings.map((b) => b.animalId);
+
+    return { animalIds: uniqueAnimalIds };
+  }
+
+  async unconfirmMostRecentBreeding(userId: string, animalId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+
+    // Validate animal belongs to company
+    await this.validateAnimalBelongsToCompany(animalId, companyId);
+
+    // Find most recent confirmed breeding
+    const breeding = await this.prisma.breeding.findFirst({
+      where: {
+        animalId,
+        companyId,
+        confirmed: true,
+        deletedAt: null,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    if (!breeding) {
+      throw new NotFoundException(
+        'No confirmed breeding found for this animal',
+      );
+    }
+
+    // Unconfirm the breeding
+    const updated = await this.prisma.breeding.update({
+      where: { id: breeding.id },
+      data: { confirmed: false },
+    });
+
+    return this.transformBreeding(updated);
+  }
+
   private async getUserCompanyId(userId: string): Promise<string> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -254,6 +489,26 @@ export class BreedingsService {
     if (serviceProviders.length !== serviceProviderIds.length) {
       throw new NotFoundException(
         'One or more service providers not found or do not belong to your company',
+      );
+    }
+  }
+
+  private async validatePropertyBelongsToCompany(
+    propertyId: string,
+    companyId: string,
+  ) {
+    const property = await this.prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        companyId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (!property) {
+      throw new NotFoundException(
+        'Property not found or does not belong to your company',
       );
     }
   }

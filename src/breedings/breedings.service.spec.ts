@@ -52,12 +52,19 @@ describe('BreedingsService', () => {
       },
       animal: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       breeding: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      birth: {
+        findFirst: jest.fn(),
+      },
+      property: {
+        findFirst: jest.fn(),
       },
       employee: {
         findMany: jest.fn(),
@@ -405,6 +412,360 @@ describe('BreedingsService', () => {
         where: { id: 'breeding-1' },
         data: { deletedAt: expect.any(Date) },
       });
+    });
+  });
+
+  describe('findUnconfirmed', () => {
+    it('should return unconfirmed breedings', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.breeding.findMany.mockResolvedValue([mockBreeding]);
+
+      const result = await service.findUnconfirmed(mockUser.id);
+
+      expect(prismaService.breeding.findMany).toHaveBeenCalledWith({
+        where: {
+          companyId: 'company-1',
+          confirmed: false,
+          deletedAt: null,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('getNextAttemptNumber', () => {
+    it('should return 1 when no breedings exist', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.birth.findFirst.mockResolvedValue(null);
+      prismaService.breeding.findMany.mockResolvedValue([]);
+
+      const result = await service.getNextAttemptNumber(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toEqual({ nextAttemptNumber: 1 });
+    });
+
+    it('should return next attempt number when no birth exists', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.birth.findFirst.mockResolvedValue(null);
+      prismaService.breeding.findMany.mockResolvedValue([
+        {
+          attemptNumber: 1,
+          date: new Date('2025-01-15'),
+        },
+        {
+          attemptNumber: 2,
+          date: new Date('2025-01-20'),
+        },
+      ]);
+
+      const result = await service.getNextAttemptNumber(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toEqual({ nextAttemptNumber: 3 });
+    });
+
+    it('should return next attempt number after most recent birth', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.birth.findFirst.mockResolvedValue({
+        birthDate: new Date('2025-01-10'),
+      });
+      prismaService.breeding.findMany.mockResolvedValue([
+        {
+          attemptNumber: 1,
+          date: new Date('2025-01-15'),
+        },
+        {
+          attemptNumber: 2,
+          date: new Date('2025-01-20'),
+        },
+      ]);
+
+      const result = await service.getNextAttemptNumber(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toEqual({ nextAttemptNumber: 3 });
+    });
+
+    it('should return 1 when no breedings after birth', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.birth.findFirst.mockResolvedValue({
+        birthDate: new Date('2025-01-20'),
+      });
+      prismaService.breeding.findMany.mockResolvedValue([
+        {
+          attemptNumber: 1,
+          date: new Date('2025-01-15'),
+        },
+      ]);
+
+      const result = await service.getNextAttemptNumber(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toEqual({ nextAttemptNumber: 1 });
+    });
+
+    it('should handle null attempt numbers', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.birth.findFirst.mockResolvedValue(null);
+      prismaService.breeding.findMany.mockResolvedValue([
+        {
+          attemptNumber: null,
+          date: new Date('2025-01-15'),
+        },
+        {
+          attemptNumber: 2,
+          date: new Date('2025-01-20'),
+        },
+      ]);
+
+      const result = await service.getNextAttemptNumber(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toEqual({ nextAttemptNumber: 3 });
+    });
+
+    it('should throw NotFoundException if animal not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getNextAttemptNumber(mockUser.id, 'animal-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('isAnimalPregnant', () => {
+    it('should return true when animal has confirmed breeding', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue({
+        ...mockBreeding,
+        confirmed: true,
+      });
+
+      const result = await service.isAnimalPregnant(mockUser.id, 'animal-1');
+
+      expect(result).toEqual({ isPregnant: true });
+    });
+
+    it('should return false when animal has no confirmed breeding', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue(null);
+
+      const result = await service.isAnimalPregnant(mockUser.id, 'animal-1');
+
+      expect(result).toEqual({ isPregnant: false });
+    });
+
+    it('should throw NotFoundException if animal not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.isAnimalPregnant(mockUser.id, 'animal-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getMostRecentConfirmedBreeding', () => {
+    it('should return most recent confirmed breeding', async () => {
+      const confirmedBreeding = {
+        ...mockBreeding,
+        confirmed: true,
+      };
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue(confirmedBreeding);
+
+      const result = await service.getMostRecentConfirmedBreeding(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toBeDefined();
+      expect(result?.confirmed).toBe(true);
+    });
+
+    it('should return null when no confirmed breeding exists', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue(null);
+
+      const result = await service.getMostRecentConfirmedBreeding(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw NotFoundException if animal not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getMostRecentConfirmedBreeding(mockUser.id, 'animal-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findByPropertyId', () => {
+    const mockProperty = {
+      id: 'property-1',
+      companyId: 'company-1',
+      deletedAt: null,
+    };
+
+    it('should return breedings for property', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findMany.mockResolvedValue([
+        { id: 'animal-1' },
+        { id: 'animal-2' },
+      ]);
+      prismaService.breeding.findMany.mockResolvedValue([mockBreeding]);
+
+      const result = await service.findByPropertyId(mockUser.id, 'property-1');
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('should return empty array when property has no animals', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findMany.mockResolvedValue([]);
+
+      const result = await service.findByPropertyId(mockUser.id, 'property-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw NotFoundException if property not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.findByPropertyId(mockUser.id, 'property-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPregnantAnimalsByProperty', () => {
+    const mockProperty = {
+      id: 'property-1',
+      companyId: 'company-1',
+      deletedAt: null,
+    };
+
+    it('should return pregnant animal IDs', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findMany.mockResolvedValue([
+        { id: 'animal-1' },
+        { id: 'animal-2' },
+      ]);
+      prismaService.breeding.findMany.mockResolvedValue([
+        { animalId: 'animal-1' },
+        { animalId: 'animal-2' },
+      ]);
+
+      const result = await service.getPregnantAnimalsByProperty(
+        mockUser.id,
+        'property-1',
+      );
+
+      expect(result.animalIds).toHaveLength(2);
+    });
+
+    it('should return empty array when no pregnant animals exist', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findMany.mockResolvedValue([{ id: 'animal-1' }]);
+      prismaService.breeding.findMany.mockResolvedValue([]);
+
+      const result = await service.getPregnantAnimalsByProperty(
+        mockUser.id,
+        'property-1',
+      );
+
+      expect(result.animalIds).toEqual([]);
+    });
+
+    it('should throw NotFoundException if property not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getPregnantAnimalsByProperty(mockUser.id, 'property-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('unconfirmMostRecentBreeding', () => {
+    it('should unconfirm most recent breeding', async () => {
+      const confirmedBreeding = {
+        ...mockBreeding,
+        confirmed: true,
+      };
+      const unconfirmedBreeding = {
+        ...mockBreeding,
+        confirmed: false,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue(confirmedBreeding);
+      prismaService.breeding.update.mockResolvedValue(unconfirmedBreeding);
+
+      const result = await service.unconfirmMostRecentBreeding(
+        mockUser.id,
+        'animal-1',
+      );
+
+      expect(prismaService.breeding.update).toHaveBeenCalledWith({
+        where: { id: confirmedBreeding.id },
+        data: { confirmed: false },
+      });
+      expect(result.confirmed).toBe(false);
+    });
+
+    it('should throw NotFoundException if animal not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.unconfirmMostRecentBreeding(mockUser.id, 'animal-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if no confirmed breeding exists', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.breeding.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.unconfirmMostRecentBreeding(mockUser.id, 'animal-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
