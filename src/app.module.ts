@@ -26,6 +26,8 @@ import { DeathsModule } from './deaths/deaths.module';
 import { WeighingsModule } from './weighings/weighings.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { InventoryMovementsModule } from './inventory-movements/inventory-movements.module';
+import { AnimalMovementsModule } from './animal-movements/animal-movements.module';
+import { LocationMovementsModule } from './location-movements/location-movements.module';
 import { BreedingsModule } from './breedings/breedings.module';
 import { SanitaryControlsModule } from './sanitary-controls/sanitary-controls.module';
 import { CashFlowModule } from './cash-flow/cash-flow.module';
@@ -88,6 +90,8 @@ import securityConfig from './common/config/security.config';
     WeighingsModule,
     InventoryItemsModule,
     InventoryMovementsModule,
+    AnimalMovementsModule,
+    LocationMovementsModule,
     BreedingsModule,
     SanitaryControlsModule,
     CashFlowModule,

@@ -71,6 +71,8 @@ model Company {
   inventoryMovements InventoryMovement[]
   breedings          Breeding[]
   sanitaryControls   SanitaryControl[]
+  animalMovements    AnimalMovement[]
+  locationMovements  LocationMovement[]
   cashFlows                CashFlow[]
   accountsPayable          AccountsPayable[]
   accountsReceivable       AccountsReceivable[]
@@ -252,6 +254,8 @@ model Property {
   cashFlows                 CashFlow[]
   accountsPayable           AccountsPayable[]
   accountsReceivable        AccountsReceivable[]
+  animalMovements           AnimalMovement[]
+  locationMovements         LocationMovement[]
 
   @@unique([companyId, code], name: "unique_property_code_per_company")
   @@index([companyId])
@@ -277,6 +281,7 @@ model Location {
   property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   inventoryMovements InventoryMovement[]
   observations       LocationObservation[]
+  animalMovements    AnimalMovement[]
 
   @@unique([companyId, propertyId, code], name: "unique_location_code_per_company_property")
   @@index([companyId])
@@ -797,6 +802,58 @@ model InventoryMovement {
   @@index([propertyId])
   @@index([deletedAt])
   @@map("inventory_movements")
+}
+
+model AnimalMovement {
+  id                 String    @id @default(cuid())
+  companyId          String
+  propertyId         String
+  locationId         String?
+  animalIds          Json // Store as JSON array: string[]
+  employeeIds        Json? // Store as JSON array: string[]
+  serviceProviderIds Json? // Store as JSON array: string[]
+  date               DateTime
+  observation        String?
+  fileIds            Json? // Store as JSON array: string[]
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([locationId])
+  @@index([deletedAt])
+  @@map("animal_movements")
+}
+
+model LocationMovement {
+  id                 String    @id @default(cuid())
+  companyId          String
+  propertyId         String
+  locationIds        Json // Store as JSON array: string[]
+  employeeIds        Json? // Store as JSON array: string[]
+  serviceProviderIds Json? // Store as JSON array: string[]
+  type               String
+  date               DateTime
+  observation        String?
+  fileIds            Json? // Store as JSON array: string[]
+  deletedAt          DateTime? // Soft delete timestamp
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([deletedAt])
+  @@map("location_movements")
 }
 
 model Breeding {

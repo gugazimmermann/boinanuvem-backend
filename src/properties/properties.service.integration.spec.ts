@@ -108,12 +108,18 @@ describeOrSkip('PropertiesService Integration Tests', () => {
     });
 
     it('should allow same code for different companies', async () => {
-      // Create another company
+      // Create another company (ensure we don't hit unique constraints)
+      await context.prisma.company.deleteMany({
+        where: {
+          cnpj: '22.333.444/0001-66',
+        },
+      });
+
       const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
-          email: 'other@testcompany.com',
+          email: `other-properties-int+${Date.now()}@testcompany.com`,
           phone: '(47) 99999-7777',
           street: 'Other Street',
           number: '456',

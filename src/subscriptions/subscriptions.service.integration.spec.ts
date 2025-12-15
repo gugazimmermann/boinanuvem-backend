@@ -281,12 +281,18 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
     });
 
     it('should fail if user does not belong to company', async () => {
-      // Create another company
+      // Create another company (ensure we don't hit unique constraints)
+      await context.prisma.company.deleteMany({
+        where: {
+          cnpj: '22.333.444/0001-66',
+        },
+      });
+
       const otherCompany = await context.prisma.company.create({
         data: {
           cnpj: '22.333.444/0001-66',
           companyName: 'Other Test Company',
-          email: 'other@testcompany.com',
+          email: `other-subscriptions-int+${Date.now()}@testcompany.com`,
           phone: '(47) 99999-6666',
           street: 'Other Street',
           number: '456',
