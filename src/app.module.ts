@@ -32,6 +32,16 @@ import { CashFlowModule } from './cash-flow/cash-flow.module';
 import { AccountsPayableModule } from './accounts-payable/accounts-payable.module';
 import { AccountsReceivableModule } from './accounts-receivable/accounts-receivable.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
+import { AnimalObservationsModule } from './animal-observations/animal-observations.module';
+import { BuyerObservationsModule } from './buyer-observations/buyer-observations.module';
+import { EmployeeObservationsModule } from './employee-observations/employee-observations.module';
+import { InventoryObservationsModule } from './inventory-observations/inventory-observations.module';
+import { LocationObservationsModule } from './location-observations/location-observations.module';
+import { ServiceProviderObservationsModule } from './service-provider-observations/service-provider-observations.module';
+import { SupplierObservationsModule } from './supplier-observations/supplier-observations.module';
+import { CashFlowObservationsModule } from './cash-flow-observations/cash-flow-observations.module';
+import { AccountsPayableObservationsModule } from './accounts-payable-observations/accounts-payable-observations.module';
+import { AccountsReceivableObservationsModule } from './accounts-receivable-observations/accounts-receivable-observations.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { FileLoggerService } from './common/logger/file-logger.service';
@@ -84,6 +94,16 @@ import securityConfig from './common/config/security.config';
     AccountsPayableModule,
     AccountsReceivableModule,
     BankAccountsModule,
+    AnimalObservationsModule,
+    BuyerObservationsModule,
+    EmployeeObservationsModule,
+    InventoryObservationsModule,
+    LocationObservationsModule,
+    ServiceProviderObservationsModule,
+    SupplierObservationsModule,
+    CashFlowObservationsModule,
+    AccountsPayableObservationsModule,
+    AccountsReceivableObservationsModule,
   ],
   controllers: [AppController],
   providers: [

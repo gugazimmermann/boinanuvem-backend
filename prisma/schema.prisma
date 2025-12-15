@@ -71,10 +71,20 @@ model Company {
   inventoryMovements InventoryMovement[]
   breedings          Breeding[]
   sanitaryControls   SanitaryControl[]
-  cashFlows          CashFlow[]
-  accountsPayable    AccountsPayable[]
-  accountsReceivable AccountsReceivable[]
-  bankAccounts       BankAccount[]
+  cashFlows                CashFlow[]
+  accountsPayable          AccountsPayable[]
+  accountsReceivable       AccountsReceivable[]
+  bankAccounts            BankAccount[]
+  animalObservations      AnimalObservation[]
+  buyerObservations       BuyerObservation[]
+  employeeObservations    EmployeeObservation[]
+  inventoryObservations   InventoryObservation[]
+  locationObservations     LocationObservation[]
+  serviceProviderObservations ServiceProviderObservation[]
+  supplierObservations     SupplierObservation[]
+  cashFlowObservations      CashFlowObservation[]
+  accountsPayableObservations AccountsPayableObservation[]
+  accountsReceivableObservations AccountsReceivableObservation[]
 
   @@map("companies")
 }
@@ -266,6 +276,7 @@ model Location {
   company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   inventoryMovements InventoryMovement[]
+  observations       LocationObservation[]
 
   @@unique([companyId, propertyId, code], name: "unique_location_code_per_company_property")
   @@index([companyId])
@@ -299,6 +310,7 @@ model Employee {
   properties      EmployeeProperty[]
   cashFlows       CashFlow[]
   accountsPayable AccountsPayable[]
+  observations    EmployeeObservation[]
 
   @@unique([companyId, code], name: "unique_employee_code_per_company")
   @@index([companyId])
@@ -348,6 +360,7 @@ model ServiceProvider {
   properties      ServiceProviderProperty[]
   cashFlows       CashFlow[]
   accountsPayable AccountsPayable[]
+  observations    ServiceProviderObservation[]
 
   @@unique([companyId, code], name: "unique_service_provider_code_per_company")
   @@index([companyId])
@@ -400,6 +413,7 @@ model Supplier {
   inventoryMovements InventoryMovement[]
   cashFlows          CashFlow[]
   accountsPayable    AccountsPayable[]
+  observations       SupplierObservation[]
 
   @@unique([companyId, code], name: "unique_supplier_code_per_company")
   @@index([companyId])
@@ -450,6 +464,7 @@ model Buyer {
   sales              Sale[]
   cashFlows          CashFlow[]
   accountsReceivable AccountsReceivable[]
+  observations       BuyerObservation[]
 
   @@unique([companyId, code], name: "unique_buyer_code_per_company")
   @@index([companyId])
@@ -588,6 +603,7 @@ model Animal {
   breedings        Breeding[]
   breedingsAsBull  Breeding[]        @relation("BreedingBull")
   sanitaryControls SanitaryControl[]
+  observations     AnimalObservation[]
 
   @@unique([companyId, code], name: "unique_animal_code_per_company")
   @@index([companyId])
@@ -722,6 +738,7 @@ model InventoryItem {
   movements        InventoryMovement[]
   sanitaryControls SanitaryControl[]       @relation("SanitaryControlInventoryItem")
   sanitaryControlItems SanitaryControlItem[]
+  observations     InventoryObservation[]
 
   @@unique([companyId, code], name: "unique_inventory_item_code_per_company")
   @@index([companyId])
@@ -890,6 +907,7 @@ model CashFlow {
   buyer           Buyer?           @relation(fields: [buyerId], references: [id], onDelete: SetNull)
   sale            Sale?            @relation(fields: [linkedSaleId], references: [id], onDelete: SetNull)
   acquisition     Acquisition?     @relation(fields: [linkedAcquisitionId], references: [id], onDelete: SetNull)
+  observations    CashFlowObservation[]
 
   @@index([companyId])
   @@index([propertyId])
@@ -927,6 +945,7 @@ model AccountsPayable {
   employee        Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   serviceProvider ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
   acquisition     Acquisition?     @relation(fields: [linkedAcquisitionId], references: [id], onDelete: SetNull)
+  observations    AccountsPayableObservation[]
 
   @@index([companyId])
   @@index([supplierId])
@@ -961,6 +980,7 @@ model AccountsReceivable {
   buyer    Buyer?    @relation(fields: [buyerId], references: [id], onDelete: SetNull)
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   sale     Sale?     @relation(fields: [linkedSaleId], references: [id], onDelete: SetNull)
+  observations AccountsReceivableObservation[]
 
   @@index([companyId])
   @@index([buyerId])
@@ -989,4 +1009,214 @@ model BankAccount {
   @@index([companyId])
   @@index([deletedAt])
   @@map("bank_accounts")
+}
+
+model AnimalObservation {
+  id          String    @id @default(cuid())
+  animalId    String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  animal  Animal  @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([animalId])
+  @@index([deletedAt])
+  @@map("animal_observations")
+}
+
+model BuyerObservation {
+  id          String    @id @default(cuid())
+  buyerId     String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  buyer   Buyer   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([buyerId])
+  @@index([deletedAt])
+  @@map("buyer_observations")
+}
+
+model EmployeeObservation {
+  id          String    @id @default(cuid())
+  employeeId  String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([deletedAt])
+  @@map("employee_observations")
+}
+
+model InventoryObservation {
+  id          String    @id @default(cuid())
+  itemId      String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([itemId])
+  @@index([deletedAt])
+  @@map("inventory_observations")
+}
+
+model LocationObservation {
+  id          String    @id @default(cuid())
+  locationId  String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([locationId])
+  @@index([deletedAt])
+  @@map("location_observations")
+}
+
+model ServiceProviderObservation {
+  id               String    @id @default(cuid())
+  serviceProviderId String
+  observation      String
+  fileIds          Json? // Store as JSON array: string[]
+  companyId        String
+  createdBy        String?
+  deletedAt        DateTime? // Soft delete timestamp
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([serviceProviderId])
+  @@index([deletedAt])
+  @@map("service_provider_observations")
+}
+
+model SupplierObservation {
+  id          String    @id @default(cuid())
+  supplierId  String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([deletedAt])
+  @@map("supplier_observations")
+}
+
+model CashFlowObservation {
+  id          String    @id @default(cuid())
+  cashFlowId  String
+  observation String
+  fileIds     Json? // Store as JSON array: string[]
+  companyId   String
+  createdBy   String?
+  deletedAt   DateTime? // Soft delete timestamp
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cashFlow CashFlow @relation(fields: [cashFlowId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([cashFlowId])
+  @@index([deletedAt])
+  @@map("cash_flow_observations")
+}
+
+model AccountsPayableObservation {
+  id                String    @id @default(cuid())
+  accountsPayableId String
+  observation       String
+  fileIds           Json? // Store as JSON array: string[]
+  companyId         String
+  createdBy         String?
+  deletedAt         DateTime? // Soft delete timestamp
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountsPayable AccountsPayable @relation(fields: [accountsPayableId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([accountsPayableId])
+  @@index([deletedAt])
+  @@map("accounts_payable_observations")
+}
+
+model AccountsReceivableObservation {
+  id                  String    @id @default(cuid())
+  accountsReceivableId String
+  observation         String
+  fileIds             Json? // Store as JSON array: string[]
+  companyId           String
+  createdBy           String?
+  deletedAt           DateTime? // Soft delete timestamp
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountsReceivable AccountsReceivable @relation(fields: [accountsReceivableId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([accountsReceivableId])
+  @@index([deletedAt])
+  @@map("accounts_receivable_observations")
 }

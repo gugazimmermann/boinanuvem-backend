@@ -31,6 +31,7 @@ export interface E2ETestOptions {
   createAnimals?: number;
   createEmployees?: number;
   createServiceProviders?: number;
+  createSupplier?: boolean;
   createRegularUser?: boolean;
   regularUserPermissions?: any;
 }
@@ -209,6 +210,17 @@ export async function setupE2ETest(
         }),
       ),
     );
+  }
+
+  // Create supplier if requested
+  if (options.createSupplier) {
+    context.testSupplier = await prisma.supplier.create({
+      data: {
+        code: '001',
+        name: 'Test Supplier',
+        companyId: testCompany.id,
+      },
+    });
   }
 
   // Create regular user with limited permissions if requested
