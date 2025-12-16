@@ -1,3 +1,4 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import { LocationMovementsService } from './location-movements.service';
 import {
   CreateLocationMovementDto,
@@ -9,10 +10,10 @@ import {
   describeOrSkip,
   setupIntegrationTest,
   teardownIntegrationTest,
-  createServiceTestingModule,
-  getServiceFromModule,
   IntegrationTestContext,
 } from '../../test/integration-test-helpers';
+import { PrismaService } from '../common/services/prisma.service';
+import { CompanyEntitiesValidationService } from '../common/services/company-entities-validation.service';
 
 describeOrSkip('LocationMovementsService Integration Tests', () => {
   let service: LocationMovementsService;
@@ -68,11 +69,18 @@ describeOrSkip('LocationMovementsService Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    const module = await createServiceTestingModule(
-      LocationMovementsService,
-      context.prisma,
-    );
-    service = getServiceFromModule(module, LocationMovementsService);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        LocationMovementsService,
+        {
+          provide: PrismaService,
+          useValue: context.prisma,
+        },
+        CompanyEntitiesValidationService,
+      ],
+    }).compile();
+
+    service = module.get<LocationMovementsService>(LocationMovementsService);
   });
 
   afterEach(async () => {

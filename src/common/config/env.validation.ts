@@ -91,6 +91,10 @@ export class EnvironmentVariables {
 
   @IsString()
   GMAIL_PASSWORD!: string;
+
+  @IsString()
+  @IsOptional()
+  STRIPE_SECRET_KEY?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

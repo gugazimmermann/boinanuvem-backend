@@ -48,6 +48,7 @@ model Company {
   trialStartDate DateTime? // When trial period started
   trialEndDate   DateTime? // When trial period ends
   trialStatus    String?   @default("active") // "active", "expired", "converted"
+  stripeCustomerId String? // Stripe customer ID (cus_xxx)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -181,6 +182,9 @@ model CompanySubscription {
   isActive     Boolean   @default(true)
   isTrial      Boolean   @default(false)
   trialEndDate DateTime?
+  stripeSubscriptionId String? // Stripe subscription ID (sub_xxx)
+  stripeCustomerId     String? // Stripe customer ID (cus_xxx)
+  stripePriceId        String? // Stripe price ID (price_xxx) for reference
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

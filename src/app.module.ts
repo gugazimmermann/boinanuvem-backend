@@ -12,6 +12,7 @@ import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
 import { EmailModule } from './email/email.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PropertiesModule } from './properties/properties.module';
 import { LocationsModule } from './locations/locations.module';
 import { EmployeesModule } from './employees/employees.module';
@@ -76,6 +77,7 @@ import securityConfig from './common/config/security.config';
     UsersModule,
     EmailModule,
     PaymentsModule,
+    SubscriptionsModule,
     PropertiesModule,
     LocationsModule,
     EmployeesModule,

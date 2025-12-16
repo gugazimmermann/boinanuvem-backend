@@ -1,14 +1,15 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import { AnimalMovementsService } from './animal-movements.service';
 import { CreateAnimalMovementDto, AnimalMovementResponseDto } from './dto';
 import {
   describeOrSkip,
   setupIntegrationTest,
   teardownIntegrationTest,
-  createServiceTestingModule,
-  getServiceFromModule,
   IntegrationTestContext,
 } from '../../test/integration-test-helpers';
 import { createTestAnimal } from '../../test/test-data-factories';
+import { PrismaService } from '../common/services/prisma.service';
+import { CompanyEntitiesValidationService } from '../common/services/company-entities-validation.service';
 
 describeOrSkip('AnimalMovementsService Integration Tests', () => {
   let service: AnimalMovementsService;
@@ -87,11 +88,18 @@ describeOrSkip('AnimalMovementsService Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    const module = await createServiceTestingModule(
-      AnimalMovementsService,
-      context.prisma,
-    );
-    service = getServiceFromModule(module, AnimalMovementsService);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AnimalMovementsService,
+        {
+          provide: PrismaService,
+          useValue: context.prisma,
+        },
+        CompanyEntitiesValidationService,
+      ],
+    }).compile();
+
+    service = module.get<AnimalMovementsService>(AnimalMovementsService);
   });
 
   afterEach(async () => {

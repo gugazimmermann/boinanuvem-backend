@@ -1,6 +1,6 @@
 {
   "name": "boinanuvem-backend",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "",
   "author": "",
   "private": true,
@@ -59,6 +59,7 @@
     "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "stripe": "^20.0.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
@@ -123,7 +124,9 @@
     ],
     "testEnvironment": "node",
     "globalSetup": "<rootDir>/../test/jest-global-setup.ts",
-    "setupFilesAfterEnv": ["<rootDir>/../test/jest-setup.ts"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/../test/jest-setup.ts"
+    ],
     "globalTeardown": "<rootDir>/../test/jest-teardown.ts",
     "maxWorkers": 1
   },

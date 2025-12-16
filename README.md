@@ -2,6 +2,32 @@
 
 A secure, scalable, and enterprise-grade NestJS backend API built with TypeScript for the Boi na Nuvem cattle management platform. This comprehensive backend provides a complete solution for livestock management, featuring advanced authentication systems, subscription management with trial periods, payment processing, robust security measures, health monitoring, metrics collection, and a PostgreSQL database with Prisma ORM.
 
+## 📋 Overview
+
+**Boi na Nuvem** is a comprehensive cattle management platform designed for Brazilian agricultural operations. The backend API provides:
+
+- **50+ Database Models** covering all aspects of cattle management
+- **40+ API Modules** with full CRUD operations
+- **549+ Tests** with 90%+ code coverage
+- **Complete Cattle Lifecycle Management**: From birth to sale, including breeding, health, and financial tracking
+- **Multi-tenant Architecture**: Company-based data isolation with granular permissions
+- **Enterprise Security**: JWT authentication, RBAC, rate limiting, and comprehensive security monitoring
+- **Financial Management**: Cash flow, accounts payable/receivable, and bank account tracking
+- **Inventory Management**: Complete inventory tracking with movements and expiration management
+- **Observations System**: Rich observation tracking with file attachments for all major entities
+
+### Key Capabilities
+
+✅ **Animal Management**: Complete animal registration, tracking, births, acquisitions, sales, deaths, and weighings  
+✅ **Breeding & Health**: Comprehensive breeding tracking and sanitary control management  
+✅ **Property & Location**: Multi-property operations with detailed location tracking  
+✅ **Financial Operations**: Cash flow, accounts payable/receivable, and payment management  
+✅ **Inventory Control**: Inventory items and movements with expiration tracking  
+✅ **People Management**: Employees, service providers, suppliers, and buyers  
+✅ **Movement Tracking**: Animal and location movement history  
+✅ **Observations**: Rich text observations with file attachments for all entities  
+✅ **Subscription & Payments**: Complete subscription lifecycle with trial periods and payment tracking
+
 ## 🚀 Technology Stack
 
 ### Core Framework & Runtime
@@ -150,12 +176,204 @@ A secure, scalable, and enterprise-grade NestJS backend API built with TypeScrip
   - Address management with geocoding integration
   - Company settings and preferences management
   - Multi-property support for large agricultural operations
-- **Cattle Management Modules** (In Development):
-  - **Animals Management**: Animal registration, tracking, and health records
-  - **Inventory Management**: Feed, supplies, and equipment tracking
-  - **Location Management**: Property and pasture management
-  - **Properties Management**: Multi-property operations support
-  - **Reports Management**: Analytics and reporting for cattle operations
+
+### 🐄 Comprehensive Cattle Management System
+
+The platform provides a complete cattle management solution with fully implemented modules:
+
+#### Property & Location Management
+- **Properties Management**: Multi-property operations with unique codes per company
+  - Property registration with area tracking (hectares, acres, etc.)
+  - Address management with geocoding (latitude/longitude)
+  - Pasture planning and breeding season configuration
+  - Soft delete support for data retention
+  - Property-specific employee, supplier, and buyer associations
+- **Locations Management**: Detailed location tracking within properties
+  - Multiple location types: pasture, barn, storage, corral, silo, field, paddock, feedlot, semi_feedlot, milking_parlor, warehouse, garage, office, residence, other
+  - Area tracking per location
+  - Location-specific inventory and animal movements
+  - Soft delete support
+
+#### Animal Management
+- **Animals Management**: Complete animal lifecycle tracking
+  - Animal registration with unique codes per company
+  - Registration number tracking
+  - Animal status management (active, inactive, sold)
+  - Property and location association
+  - Birth, acquisition, sale, and death tracking
+  - Soft delete support
+- **Births Management**: Birth record tracking
+  - Birth date and breed information
+  - Gender tracking (male/female)
+  - Parent tracking (mother/father)
+  - Purity classification (PO, PC, F1-F5)
+  - Birth observations
+- **Acquisitions Management**: Animal purchase tracking
+  - Individual or total pricing modes
+  - Payment method integration (cash flow or accounts payable)
+  - Transportation and handling fees
+  - Custom fee tracking
+  - Acquisition items with detailed animal information
+  - Weight and cost per arroba calculations
+- **Sales Management**: Animal sale tracking
+  - Sale types: slaughterhouse, other farm, auction
+  - Individual or total pricing modes
+  - Payment method integration (cash flow or accounts receivable)
+  - Transportation and additional fees
+  - Sale items with weight and carcass weight tracking
+- **Deaths Management**: Animal death record tracking
+  - Death date and cause tracking
+  - Death observations
+- **Weighings Management**: Animal weight tracking
+  - Weight history with dates
+  - Employee and service provider associations
+  - Applied medicines tracking with calculated dosages
+  - Weighing observations
+
+#### Breeding & Health Management
+- **Breedings Management**: Comprehensive breeding tracking
+  - Breeding methods: natural or artificial insemination
+  - Bull tracking for natural breeding
+  - Attempt number tracking for artificial insemination
+  - Semen code tracking
+  - Confirmation status
+  - Employee and service provider associations
+  - Breeding observations
+- **Sanitary Controls Management**: Health and medical record tracking
+  - Sanitary control date tracking
+  - Multiple medicine/vaccine application support
+  - Quantity and calculated dosage tracking
+  - Employee and service provider associations
+  - Sanitary control observations
+
+#### Inventory Management
+- **Inventory Items Management**: Complete inventory tracking
+  - Item codes unique per company
+  - Multiple categories: tools, feed, supplements, vitamins, medicines, vaccines, fertilizer, custom
+  - Unit tracking (kg, liters, units, etc.)
+  - Minimum stock alerts
+  - Unit price tracking
+  - Supplier associations
+  - Expiration date tracking for perishable items
+  - Usage amount and basis tracking (per animal, per kg, etc.)
+  - Property associations
+  - Soft delete support
+- **Inventory Movements Management**: Inventory transaction tracking
+  - Movement types: purchase, sale, adjustment, consumption, transfer
+  - Quantity and unit price tracking
+  - Supplier associations
+  - Property and location tracking
+  - Employee and service provider associations
+  - Expiration date tracking
+  - File attachments support
+  - Cash flow integration
+  - Soft delete support
+
+#### Movement Tracking
+- **Animal Movements Management**: Animal location tracking
+  - Multi-animal movement support
+  - Property and location associations
+  - Employee and service provider associations
+  - Movement date and observations
+  - File attachments support
+  - Soft delete support
+- **Location Movements Management**: Location activity tracking
+  - Multi-location movement support
+  - Movement type classification
+  - Property associations
+  - Employee and service provider associations
+  - Movement date and observations
+  - File attachments support
+  - Soft delete support
+
+#### Financial Management
+- **Cash Flow Management**: Complete cash flow tracking
+  - Income and expense tracking
+  - Category and payment method classification
+  - Status tracking (completed, pending, cancelled)
+  - Bank account associations
+  - Property, employee, service provider, supplier, and buyer associations
+  - Payment date tracking
+  - Reference number tracking
+  - Sale and acquisition linking
+  - Cash flow observations
+  - Soft delete support
+- **Accounts Payable Management**: Payable tracking
+  - Supplier associations
+  - Due date and payment tracking
+  - Status tracking (unpaid, paid, overdue, partial, cancelled)
+  - Bank account associations
+  - Property, employee, and service provider associations
+  - Acquisition linking
+  - Accounts payable observations
+  - Soft delete support
+- **Accounts Receivable Management**: Receivable tracking
+  - Buyer associations
+  - Due date and payment tracking
+  - Status tracking (unpaid, paid, overdue, partial, cancelled)
+  - Bank account associations
+  - Property associations
+  - Sale linking
+  - Accounts receivable observations
+  - Soft delete support
+- **Bank Accounts Management**: Bank account tracking
+  - Bank name, code, branch, and account number
+  - Account types: checking, savings, investment
+  - Account holder name tracking
+  - Status management (active, inactive)
+  - Soft delete support
+
+#### People & Relationships Management
+- **Employees Management**: Employee tracking
+  - Employee codes unique per company
+  - CPF, email, and phone tracking
+  - Address information
+  - Property associations
+  - Status management (active, inactive)
+  - Soft delete support
+- **Service Providers Management**: Service provider tracking
+  - Service provider codes unique per company
+  - CPF/CNPJ tracking
+  - Email and phone tracking
+  - Address information
+  - Property associations
+  - Status management (active, inactive)
+  - Soft delete support
+- **Suppliers Management**: Supplier tracking
+  - Supplier codes unique per company
+  - CPF/CNPJ tracking
+  - Email and phone tracking
+  - Address information
+  - Property associations
+  - Status management (active, inactive)
+  - Soft delete support
+- **Buyers Management**: Buyer tracking
+  - Buyer codes unique per company
+  - CPF/CNPJ tracking
+  - Email and phone tracking
+  - Address information
+  - Property associations
+  - Status management (active, inactive)
+  - Soft delete support
+
+#### Observations System
+Comprehensive observation tracking for all major entities:
+- **Animal Observations**: Notes and file attachments for animals
+- **Buyer Observations**: Notes and file attachments for buyers
+- **Employee Observations**: Notes and file attachments for employees
+- **Inventory Observations**: Notes and file attachments for inventory items
+- **Location Observations**: Notes and file attachments for locations
+- **Service Provider Observations**: Notes and file attachments for service providers
+- **Supplier Observations**: Notes and file attachments for suppliers
+- **Cash Flow Observations**: Notes and file attachments for cash flow entries
+- **Accounts Payable Observations**: Notes and file attachments for accounts payable
+- **Accounts Receivable Observations**: Notes and file attachments for accounts receivable
+
+All observations support:
+- Rich text observations
+- File attachments (JSON array of file IDs)
+- Creator tracking
+- Soft delete support
 
 ### 🛡️ Enterprise Security Features
 - **Comprehensive Security Headers**: 
@@ -585,6 +803,189 @@ The documentation includes:
 - `POST /payments` - Create payment record (main user only)
 - `PUT /payments/:id` - Update payment status (main user only)
 
+### Cattle Management Endpoints
+
+#### Properties Management
+- `GET /properties` - List all properties (with pagination and filtering)
+- `GET /properties/:id` - Get property details
+- `POST /properties` - Create new property
+- `PUT /properties/:id` - Update property
+- `DELETE /properties/:id` - Soft delete property
+
+#### Locations Management
+- `GET /locations` - List all locations (with pagination and filtering)
+- `GET /locations/:id` - Get location details
+- `POST /locations` - Create new location
+- `PUT /locations/:id` - Update location
+- `DELETE /locations/:id` - Soft delete location
+
+#### Animals Management
+- `GET /animals` - List all animals (with pagination and filtering)
+- `GET /animals/:id` - Get animal details
+- `POST /animals` - Create new animal
+- `PUT /animals/:id` - Update animal
+- `DELETE /animals/:id` - Soft delete animal
+
+#### Births Management
+- `GET /births` - List all births (with pagination and filtering)
+- `GET /births/:id` - Get birth details
+- `POST /births` - Create new birth record
+- `PUT /births/:id` - Update birth record
+- `DELETE /births/:id` - Soft delete birth record
+
+#### Acquisitions Management
+- `GET /acquisitions` - List all acquisitions (with pagination and filtering)
+- `GET /acquisitions/:id` - Get acquisition details
+- `POST /acquisitions` - Create new acquisition
+- `PUT /acquisitions/:id` - Update acquisition
+- `DELETE /acquisitions/:id` - Soft delete acquisition
+
+#### Sales Management
+- `GET /sales` - List all sales (with pagination and filtering)
+- `GET /sales/:id` - Get sale details
+- `POST /sales` - Create new sale
+- `PUT /sales/:id` - Update sale
+- `DELETE /sales/:id` - Soft delete sale
+
+#### Deaths Management
+- `GET /deaths` - List all deaths (with pagination and filtering)
+- `GET /deaths/:id` - Get death details
+- `POST /deaths` - Create new death record
+- `PUT /deaths/:id` - Update death record
+- `DELETE /deaths/:id` - Soft delete death record
+
+#### Weighings Management
+- `GET /weighings` - List all weighings (with pagination and filtering)
+- `GET /weighings/:id` - Get weighing details
+- `POST /weighings` - Create new weighing
+- `PUT /weighings/:id` - Update weighing
+- `DELETE /weighings/:id` - Soft delete weighing
+
+#### Breedings Management
+- `GET /breedings` - List all breedings (with pagination and filtering)
+- `GET /breedings/:id` - Get breeding details
+- `POST /breedings` - Create new breeding
+- `PUT /breedings/:id` - Update breeding
+- `DELETE /breedings/:id` - Soft delete breeding
+
+#### Sanitary Controls Management
+- `GET /sanitary-controls` - List all sanitary controls (with pagination and filtering)
+- `GET /sanitary-controls/:id` - Get sanitary control details
+- `POST /sanitary-controls` - Create new sanitary control
+- `PUT /sanitary-controls/:id` - Update sanitary control
+- `DELETE /sanitary-controls/:id` - Soft delete sanitary control
+
+#### Inventory Management
+- `GET /inventory-items` - List all inventory items (with pagination and filtering)
+- `GET /inventory-items/:id` - Get inventory item details
+- `POST /inventory-items` - Create new inventory item
+- `PUT /inventory-items/:id` - Update inventory item
+- `DELETE /inventory-items/:id` - Soft delete inventory item
+
+#### Inventory Movements Management
+- `GET /inventory-movements` - List all inventory movements (with pagination and filtering)
+- `GET /inventory-movements/:id` - Get inventory movement details
+- `POST /inventory-movements` - Create new inventory movement
+- `PUT /inventory-movements/:id` - Update inventory movement
+- `DELETE /inventory-movements/:id` - Soft delete inventory movement
+
+#### Animal Movements Management
+- `GET /animal-movements` - List all animal movements (with pagination and filtering)
+- `GET /animal-movements/:id` - Get animal movement details
+- `POST /animal-movements` - Create new animal movement
+- `PUT /animal-movements/:id` - Update animal movement
+- `DELETE /animal-movements/:id` - Soft delete animal movement
+
+#### Location Movements Management
+- `GET /location-movements` - List all location movements (with pagination and filtering)
+- `GET /location-movements/:id` - Get location movement details
+- `POST /location-movements` - Create new location movement
+- `PUT /location-movements/:id` - Update location movement
+- `DELETE /location-movements/:id` - Soft delete location movement
+
+### Financial Management Endpoints
+
+#### Cash Flow Management
+- `GET /cash-flow` - List all cash flow entries (with pagination and filtering)
+- `GET /cash-flow/:id` - Get cash flow entry details
+- `POST /cash-flow` - Create new cash flow entry
+- `PUT /cash-flow/:id` - Update cash flow entry
+- `DELETE /cash-flow/:id` - Soft delete cash flow entry
+
+#### Accounts Payable Management
+- `GET /accounts-payable` - List all accounts payable (with pagination and filtering)
+- `GET /accounts-payable/:id` - Get accounts payable details
+- `POST /accounts-payable` - Create new accounts payable
+- `PUT /accounts-payable/:id` - Update accounts payable
+- `DELETE /accounts-payable/:id` - Soft delete accounts payable
+
+#### Accounts Receivable Management
+- `GET /accounts-receivable` - List all accounts receivable (with pagination and filtering)
+- `GET /accounts-receivable/:id` - Get accounts receivable details
+- `POST /accounts-receivable` - Create new accounts receivable
+- `PUT /accounts-receivable/:id` - Update accounts receivable
+- `DELETE /accounts-receivable/:id` - Soft delete accounts receivable
+
+#### Bank Accounts Management
+- `GET /bank-accounts` - List all bank accounts (with pagination and filtering)
+- `GET /bank-accounts/:id` - Get bank account details
+- `POST /bank-accounts` - Create new bank account
+- `PUT /bank-accounts/:id` - Update bank account
+- `DELETE /bank-accounts/:id` - Soft delete bank account
+
+### People & Relationships Management Endpoints
+
+#### Employees Management
+- `GET /employees` - List all employees (with pagination and filtering)
+- `GET /employees/:id` - Get employee details
+- `POST /employees` - Create new employee
+- `PUT /employees/:id` - Update employee
+- `DELETE /employees/:id` - Soft delete employee
+
+#### Service Providers Management
+- `GET /service-providers` - List all service providers (with pagination and filtering)
+- `GET /service-providers/:id` - Get service provider details
+- `POST /service-providers` - Create new service provider
+- `PUT /service-providers/:id` - Update service provider
+- `DELETE /service-providers/:id` - Soft delete service provider
+
+#### Suppliers Management
+- `GET /suppliers` - List all suppliers (with pagination and filtering)
+- `GET /suppliers/:id` - Get supplier details
+- `POST /suppliers` - Create new supplier
+- `PUT /suppliers/:id` - Update supplier
+- `DELETE /suppliers/:id` - Soft delete supplier
+
+#### Buyers Management
+- `GET /buyers` - List all buyers (with pagination and filtering)
+- `GET /buyers/:id` - Get buyer details
+- `POST /buyers` - Create new buyer
+- `PUT /buyers/:id` - Update buyer
+- `DELETE /buyers/:id` - Soft delete buyer
+
+### Observations Endpoints
+
+All observation endpoints follow the same pattern:
+- `GET /{entity}-observations` - List observations for an entity
+- `GET /{entity}-observations/:id` - Get observation details
+- `POST /{entity}-observations` - Create new observation
+- `PUT /{entity}-observations/:id` - Update observation
+- `DELETE /{entity}-observations/:id` - Soft delete observation
+
+Available observation endpoints:
+- `/animal-observations` - Animal observations
+- `/buyer-observations` - Buyer observations
+- `/employee-observations` - Employee observations
+- `/inventory-observations` - Inventory item observations
+- `/location-observations` - Location observations
+- `/service-provider-observations` - Service provider observations
+- `/supplier-observations` - Supplier observations
+- `/cash-flow-observations` - Cash flow observations
+- `/accounts-payable-observations` - Accounts payable observations
+- `/accounts-receivable-observations` - Accounts receivable observations
+
+> **Note**: All endpoints require JWT authentication and appropriate permissions. Most endpoints support pagination, filtering, and soft delete operations. Check the Swagger documentation for detailed request/response schemas.
+
 ## Trial System
 
 ### Overview
@@ -798,89 +1199,224 @@ API_PREFIX=api/v1
 
 ```
 src/
-├── auth/                   # Authentication & authorization module
-│   ├── decorators/        # Custom decorators (permissions, current user)
-│   ├── dto/              # Authentication DTOs (login, register, etc.)
-│   ├── guards/           # JWT and permissions guards
-│   ├── strategies/       # Passport JWT strategy
-│   ├── auth.controller.ts # Authentication endpoints
-│   ├── auth.service.ts   # Authentication business logic
-│   └── auth.module.ts    # Authentication module configuration
-├── companies/             # Company management module
-│   ├── dto/              # Company DTOs
+├── auth/                          # Authentication & authorization module
+│   ├── decorators/                # Custom decorators (permissions, current user)
+│   ├── dto/                       # Authentication DTOs (login, register, etc.)
+│   ├── guards/                    # JWT and permissions guards
+│   ├── strategies/                # Passport JWT strategy
+│   ├── auth.controller.ts        # Authentication endpoints
+│   ├── auth.service.ts           # Authentication business logic
+│   └── auth.module.ts            # Authentication module configuration
+├── companies/                     # Company management module
+│   ├── dto/                       # Company DTOs
 │   ├── companies.controller.ts
 │   ├── companies.service.ts
 │   └── companies.module.ts
-├── users/                 # User management module
-│   ├── dto/              # User management DTOs
+├── users/                         # User management module
+│   ├── dto/                       # User management DTOs
 │   ├── users.controller.ts
 │   ├── users.service.ts
 │   └── users.module.ts
-├── email/                 # Email service module
-│   ├── email.service.ts  # Nodemailer Gmail SMTP service
-│   └── email.module.ts   # Email module configuration
-├── common/                # Shared utilities and configurations
-│   ├── config/           # Environment and security configuration
-│   ├── dto/              # Shared Data Transfer Objects
-│   ├── guards/           # Security guards and middleware
-│   ├── interceptors/     # Request/response interceptors
-│   ├── logger/           # Custom logging service
-│   └── services/         # Shared services (Prisma, Trial service, etc.)
-├── health/               # Health check module
-├── metrics/              # Prometheus metrics module
-├── plans/                # Pricing plans management module
-│   ├── dto/             # Plans-specific DTOs
+├── email/                         # Email service module
+│   ├── email.service.ts          # Nodemailer Gmail SMTP service
+│   └── email.module.ts           # Email module configuration
+├── common/                        # Shared utilities and configurations
+│   ├── config/                    # Environment and security configuration
+│   ├── dto/                       # Shared Data Transfer Objects
+│   ├── guards/                    # Security guards and middleware
+│   ├── interceptors/              # Request/response interceptors
+│   ├── logger/                    # Custom logging service
+│   ├── observations/              # Base observation controller
+│   └── services/                  # Shared services (Prisma, Trial service, etc.)
+├── health/                        # Health check module
+├── metrics/                       # Prometheus metrics module
+├── plans/                         # Pricing plans management module
+│   ├── dto/                       # Plans-specific DTOs
 │   ├── plans.controller.ts
 │   ├── plans.service.ts
 │   └── plans.module.ts
-├── subscriptions/        # Subscription management module (service only, no HTTP endpoints)
-│   ├── subscriptions.service.ts # Subscription lifecycle management
-│   └── subscriptions.service.spec.ts # Subscription tests
-├── payments/             # Payment management module
-│   ├── payments.service.ts # Payment processing and tracking
-│   └── payments.service.spec.ts # Payment tests
-├── animals/              # Animal management module (in development)
-│   └── dto/             # Animal-related DTOs
-├── inventory/            # Inventory management module (in development)
-│   └── dto/             # Inventory-related DTOs
-├── locations/            # Location management module (in development)
-│   └── dto/             # Location-related DTOs
-├── properties/           # Properties management module (in development)
-│   └── dto/             # Property-related DTOs
-├── reports/              # Reports management module (in development)
-│   └── dto/             # Report-related DTOs
-├── app.controller.ts     # Main application controller
-├── app.module.ts         # Root application module
-├── app.service.ts        # Main application service
-└── main.ts              # Application bootstrap
+├── subscriptions/                 # Subscription management module (service only)
+│   ├── subscriptions.service.ts  # Subscription lifecycle management
+│   └── subscriptions.service.spec.ts
+├── payments/                      # Payment management module
+│   ├── payments.controller.ts
+│   ├── payments.service.ts
+│   └── payments.module.ts
+│
+├── properties/                    # Properties management module
+│   ├── dto/                       # Property DTOs
+│   ├── properties.controller.ts
+│   ├── properties.service.ts
+│   └── properties.module.ts
+├── locations/                     # Locations management module
+│   ├── dto/                       # Location DTOs
+│   ├── locations.controller.ts
+│   ├── locations.service.ts
+│   └── locations.module.ts
+│
+├── animals/                       # Animal management module
+│   ├── dto/                       # Animal DTOs
+│   ├── animals.controller.ts
+│   ├── animals.service.ts
+│   └── animals.module.ts
+├── births/                        # Birth records module
+│   ├── dto/                       # Birth DTOs
+│   ├── births.controller.ts
+│   ├── births.service.ts
+│   └── births.module.ts
+├── acquisitions/                  # Animal acquisitions module
+│   ├── dto/                       # Acquisition DTOs
+│   ├── acquisitions.controller.ts
+│   ├── acquisitions.service.ts
+│   └── acquisitions.module.ts
+├── sales/                         # Animal sales module
+│   ├── dto/                       # Sale DTOs
+│   ├── sales.controller.ts
+│   ├── sales.service.ts
+│   └── sales.module.ts
+├── deaths/                        # Animal deaths module
+│   ├── dto/                       # Death DTOs
+│   ├── deaths.controller.ts
+│   ├── deaths.service.ts
+│   └── deaths.module.ts
+├── weighings/                     # Animal weighings module
+│   ├── dto/                       # Weighing DTOs
+│   ├── weighings.controller.ts
+│   ├── weighings.service.ts
+│   └── weighings.module.ts
+│
+├── breedings/                     # Breeding management module
+│   ├── dto/                       # Breeding DTOs
+│   ├── breedings.controller.ts
+│   ├── breedings.service.ts
+│   └── breedings.module.ts
+├── sanitary-controls/             # Sanitary controls module
+│   ├── dto/                       # Sanitary control DTOs
+│   ├── sanitary-controls.controller.ts
+│   ├── sanitary-controls.service.ts
+│   └── sanitary-controls.module.ts
+│
+├── inventory-items/               # Inventory items module
+│   ├── dto/                       # Inventory item DTOs
+│   ├── inventory-items.controller.ts
+│   ├── inventory-items.service.ts
+│   └── inventory-items.module.ts
+├── inventory-movements/           # Inventory movements module
+│   ├── dto/                       # Inventory movement DTOs
+│   ├── inventory-movements.controller.ts
+│   ├── inventory-movements.service.ts
+│   └── inventory-movements.module.ts
+│
+├── animal-movements/              # Animal movements module
+│   ├── dto/                       # Animal movement DTOs
+│   ├── animal-movements.controller.ts
+│   ├── animal-movements.service.ts
+│   └── animal-movements.module.ts
+├── location-movements/            # Location movements module
+│   ├── dto/                       # Location movement DTOs
+│   ├── location-movements.controller.ts
+│   ├── location-movements.service.ts
+│   └── location-movements.module.ts
+│
+├── employees/                     # Employees management module
+│   ├── dto/                       # Employee DTOs
+│   ├── employees.controller.ts
+│   ├── employees.service.ts
+│   └── employees.module.ts
+├── service-providers/             # Service providers module
+│   ├── dto/                       # Service provider DTOs
+│   ├── service-providers.controller.ts
+│   ├── service-providers.service.ts
+│   └── service-providers.module.ts
+├── suppliers/                     # Suppliers module
+│   ├── dto/                       # Supplier DTOs
+│   ├── suppliers.controller.ts
+│   ├── suppliers.service.ts
+│   └── suppliers.module.ts
+├── buyers/                        # Buyers module
+│   ├── dto/                       # Buyer DTOs
+│   ├── buyers.controller.ts
+│   ├── buyers.service.ts
+│   └── buyers.module.ts
+│
+├── cash-flow/                     # Cash flow management module
+│   ├── dto/                       # Cash flow DTOs
+│   ├── cash-flow.controller.ts
+│   ├── cash-flow.service.ts
+│   └── cash-flow.module.ts
+├── accounts-payable/              # Accounts payable module
+│   ├── dto/                       # Accounts payable DTOs
+│   ├── accounts-payable.controller.ts
+│   ├── accounts-payable.service.ts
+│   └── accounts-payable.module.ts
+├── accounts-receivable/           # Accounts receivable module
+│   ├── dto/                       # Accounts receivable DTOs
+│   ├── accounts-receivable.controller.ts
+│   ├── accounts-receivable.service.ts
+│   └── accounts-receivable.module.ts
+├── bank-accounts/                 # Bank accounts module
+│   ├── dto/                       # Bank account DTOs
+│   ├── bank-accounts.controller.ts
+│   ├── bank-accounts.service.ts
+│   └── bank-accounts.module.ts
+│
+├── animal-observations/            # Animal observations module
+├── buyer-observations/            # Buyer observations module
+├── employee-observations/         # Employee observations module
+├── inventory-observations/        # Inventory observations module
+├── location-observations/          # Location observations module
+├── service-provider-observations/ # Service provider observations module
+├── supplier-observations/          # Supplier observations module
+├── cash-flow-observations/        # Cash flow observations module
+├── accounts-payable-observations/ # Accounts payable observations module
+└── accounts-receivable-observations/ # Accounts receivable observations module
+│   # Each observation module follows the same structure:
+│   ├── dto/                       # Observation DTOs
+│   ├── {entity}-observations.controller.ts
+│   ├── {entity}-observations.service.ts
+│   └── {entity}-observations.module.ts
+│
+├── app.controller.ts              # Main application controller
+├── app.module.ts                  # Root application module
+├── app.service.ts                 # Main application service
+└── main.ts                       # Application bootstrap
 
-prisma/                   # Database schema and migrations
-├── migrations/           # Database migration files
-├── schema.prisma        # Prisma schema definition (includes auth tables)
-└── seed.ts             # Database seeding script
+prisma/                            # Database schema and migrations
+├── migrations/                   # Database migration files
+├── schema.prisma                 # Prisma schema definition (50+ models)
+└── seed.ts                       # Database seeding script
 
-test/                     # End-to-end tests
-├── auth.e2e-spec.ts     # Authentication E2E tests (if implemented)
-├── app.e2e-spec.ts      # Application E2E tests
-├── plans.e2e-spec.ts    # Plans E2E tests
-└── security.e2e-spec.ts # Security E2E tests
+test/                              # Test suites
+├── jest-global-setup.ts          # Global test setup
+├── jest-setup.ts                 # Test configuration
+├── jest-teardown.ts              # Global test teardown
+├── jest-integration.json         # Integration test config
+├── jest-e2e.json                 # E2E test config
+└── [various test files]          # Unit, integration, and E2E tests
 
-logs/                     # Application logs (auto-generated)
-dist/                     # Compiled JavaScript (auto-generated)
-docker-compose.yml        # Docker services configuration
+logs/                              # Application logs (auto-generated)
+├── combined-*.log                # Combined logs
+├── error-*.log                   # Error logs
+├── warn-*.log                    # Warning logs
+├── info-*.log                    # Info logs
+└── debug-*.log                   # Debug logs
+
+dist/                              # Compiled JavaScript (auto-generated)
+coverage/                          # Test coverage reports (auto-generated)
+docker-compose.yml                 # Docker services configuration
 ```
 
 ## Database Schema
 
-The application uses PostgreSQL with Prisma ORM. The schema includes:
+The application uses PostgreSQL with Prisma ORM. The schema includes **50+ models** covering all aspects of cattle management:
 
-### Authentication Tables
+### Authentication & User Management
 
 #### Companies
 - **id**: Unique identifier (CUID)
-- **cnpj**: Brazilian company registration number
+- **cnpj**: Brazilian company registration number (unique)
 - **companyName**: Company name
-- **email**: Company contact email
+- **email**: Company contact email (unique)
 - **phone**: Company phone number
 - **address**: Complete address information (street, number, complement, neighborhood, city, state, zipCode)
 - **coordinates**: Optional latitude/longitude for location services
@@ -910,23 +1446,11 @@ The application uses PostgreSQL with Prisma ORM. The schema includes:
 - **EmailVerification**: Email verification tokens with usage tracking
 - **PasswordReset**: Password reset tokens with usage tracking
 
-#### Subscription Management Tables
-- **CompanySubscription**: Subscription records linking companies to plans
-  - Subscription status (active, cancelled, expired, trial)
-  - Billing cycle (monthly, annual)
-  - Trial period tracking
-  - Start and end dates
-- **CompanyPayment**: Payment transaction records
-  - Payment amounts and currency (BRL)
-  - Payment status (pending, paid, failed, refunded, cancelled)
-  - Payment methods (credit_card, pix, bank_transfer, boleto)
-  - External payment gateway integration
-  - Due dates and payment dates
+### Subscription & Payment Management
 
-### Plans Table
-Stores pricing plan information for the Boinanuvem platform:
+#### Plans
 - **id**: Unique identifier (CUID)
-- **name**: Plan name (Mínimo, Básico, Padrão, Avançado)
+- **name**: Plan name (unique: Mínimo, Básico, Padrão, Avançado)
 - **description**: Plan description
 - **monthlyPrice**: Monthly subscription price
 - **annualPrice**: Annual subscription price (with discount)
@@ -935,6 +1459,462 @@ Stores pricing plan information for the Boinanuvem platform:
 - **popular**: Boolean flag for highlighting popular plans
 - **status**: Plan status (active/inactive)
 - **createdAt/updatedAt**: Timestamps
+
+#### CompanySubscription
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **planId**: Reference to plan
+- **status**: Subscription status (active, cancelled, expired, trial)
+- **startDate**: Subscription start date
+- **endDate**: Subscription end date (nullable)
+- **billingCycle**: Billing cycle (monthly, annual)
+- **isActive**: Active status flag
+- **isTrial**: Trial subscription flag
+- **trialEndDate**: Trial end date (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### CompanyPayment
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **subscriptionId**: Reference to subscription (nullable)
+- **amount**: Payment amount (Decimal 10,2)
+- **currency**: Currency code (default: BRL)
+- **status**: Payment status (pending, paid, failed, refunded, cancelled)
+- **paymentMethod**: Payment method (credit_card, pix, bank_transfer, boleto)
+- **paymentDate**: Payment date (nullable)
+- **dueDate**: Payment due date
+- **description**: Payment description (nullable)
+- **externalId**: External payment gateway ID (nullable)
+- **metadata**: Additional payment metadata (JSON, nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Property & Location Management
+
+#### Property
+- **id**: Unique identifier (CUID)
+- **code**: Property code (unique per company)
+- **name**: Property name
+- **area**: Area information (JSON: {value, type})
+- **status**: Property status (active, inactive)
+- **companyId**: Reference to company
+- **address**: Complete address information
+- **coordinates**: Optional latitude/longitude
+- **pasturePlanning**: Pasture planning data (JSON array, nullable)
+- **breedingMonths**: Breeding months configuration (JSON array, nullable)
+- **pasturePlanningModifiedByUser**: User modification flag
+- **breedingSeasonModifiedByUser**: User modification flag
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Location
+- **id**: Unique identifier (CUID)
+- **code**: Location code (unique per company/property)
+- **name**: Location name
+- **locationType**: Location type (pasture, barn, storage, corral, silo, field, paddock, feedlot, semi_feedlot, milking_parlor, warehouse, garage, office, residence, other)
+- **area**: Area information (JSON: {value, type})
+- **status**: Location status (active, inactive)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Animal Management
+
+#### Animal
+- **id**: Unique identifier (CUID)
+- **code**: Animal code (unique per company)
+- **registrationNumber**: Animal registration number
+- **acquisitionDate**: Acquisition date (nullable)
+- **status**: Animal status (active, inactive, sold)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Birth
+- **id**: Unique identifier (CUID)
+- **animalId**: Reference to animal (unique)
+- **birthDate**: Birth date
+- **breed**: Breed information (nullable)
+- **gender**: Gender (male, female, nullable)
+- **motherId**: Reference to mother animal (nullable)
+- **fatherId**: Reference to father animal (nullable)
+- **purity**: Purity classification (PO, PC, F1-F5, nullable)
+- **observation**: Birth observation (nullable)
+- **companyId**: Reference to company
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Acquisition
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **supplierId**: Reference to supplier
+- **acquisitionDate**: Acquisition date
+- **pricingMode**: Pricing mode (individual, total)
+- **paymentMethod**: Payment method (cash_flow, accounts_payable)
+- **totalPrice**: Total price (Decimal 10,2)
+- **transportationFee**: Transportation fee (Decimal 10,2, nullable)
+- **handlingFee**: Handling fee (Decimal 10,2, nullable)
+- **fees**: Custom fees (JSON array, nullable)
+- **linkedCashFlowId**: Linked cash flow ID (nullable)
+- **linkedAccountsPayableId**: Linked accounts payable ID (nullable)
+- **observation**: Acquisition observation (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### AcquisitionItem
+- **id**: Unique identifier (CUID)
+- **acquisitionId**: Reference to acquisition
+- **animalId**: Reference to animal (unique)
+- **price**: Item price (Decimal 10,2)
+- **weight**: Animal weight (Decimal 10,2)
+- **costPerArroba**: Cost per arroba (Decimal 10,2)
+- **breed**: Breed information (nullable)
+- **gender**: Gender (male, female, nullable)
+- **birthDate**: Birth date (nullable)
+- **motherId**: Reference to mother (nullable)
+- **fatherId**: Reference to father (nullable)
+- **motherRegistrationNumber**: Mother registration number (nullable)
+- **fatherRegistrationNumber**: Father registration number (nullable)
+- **purity**: Purity classification (nullable)
+- **birthObservation**: Birth observation (nullable)
+- **createdAt**: Timestamp
+
+#### Sale
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **buyerId**: Reference to buyer
+- **saleDate**: Sale date
+- **saleType**: Sale type (slaughterhouse, other_farm, auction)
+- **pricingMode**: Pricing mode (individual, total)
+- **paymentMethod**: Payment method (cash_flow, accounts_receivable)
+- **totalPrice**: Total price (Decimal 10,2)
+- **fees**: Custom fees (JSON array, nullable)
+- **transportationFee**: Transportation fee (Decimal 10,2, nullable)
+- **additionalFees**: Additional fees (Decimal 10,2, nullable)
+- **linkedCashFlowId**: Linked cash flow ID (nullable)
+- **linkedAccountsReceivableId**: Linked accounts receivable ID (nullable)
+- **observation**: Sale observation (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### SaleItem
+- **id**: Unique identifier (CUID)
+- **saleId**: Reference to sale
+- **animalId**: Reference to animal
+- **price**: Item price (Decimal 10,2)
+- **weight**: Animal weight (Decimal 10,2)
+- **carcassWeight**: Carcass weight (Decimal 10,2, nullable)
+- **createdAt**: Timestamp
+
+#### Death
+- **id**: Unique identifier (CUID)
+- **animalId**: Reference to animal (unique)
+- **deathDate**: Death date
+- **cause**: Death cause
+- **observation**: Death observation (nullable)
+- **companyId**: Reference to company
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Weighing
+- **id**: Unique identifier (CUID)
+- **animalId**: Reference to animal
+- **weighingDate**: Weighing date
+- **weight**: Animal weight (Decimal 10,2)
+- **employeeIds**: Employee IDs (JSON array)
+- **serviceProviderIds**: Service provider IDs (JSON array)
+- **appliedMedicines**: Applied medicines (JSON array, nullable)
+- **observation**: Weighing observation (nullable)
+- **companyId**: Reference to company
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Breeding & Health Management
+
+#### Breeding
+- **id**: Unique identifier (CUID)
+- **animalId**: Reference to animal
+- **date**: Breeding date
+- **method**: Breeding method (natural, artificial_insemination)
+- **bullId**: Reference to bull animal (nullable)
+- **attemptNumber**: Attempt number (nullable)
+- **semenCode**: Semen code (nullable)
+- **confirmed**: Confirmation status
+- **observation**: Breeding observation (nullable)
+- **companyId**: Reference to company
+- **employeeIds**: Employee IDs (JSON array, nullable)
+- **serviceProviderIds**: Service provider IDs (JSON array, nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### SanitaryControl
+- **id**: Unique identifier (CUID)
+- **animalId**: Reference to animal
+- **date**: Sanitary control date
+- **itemId**: Inventory item ID (legacy, nullable)
+- **quantity**: Quantity (legacy, nullable)
+- **calculatedDosage**: Calculated dosage (legacy, nullable)
+- **observation**: Sanitary control observation (nullable)
+- **companyId**: Reference to company
+- **employeeIds**: Employee IDs (JSON array, nullable)
+- **serviceProviderIds**: Service provider IDs (JSON array, nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### SanitaryControlItem
+- **id**: Unique identifier (CUID)
+- **sanitaryControlId**: Reference to sanitary control
+- **itemId**: Reference to inventory item
+- **quantity**: Item quantity (Decimal 10,2)
+- **calculatedDosage**: Calculated dosage (Decimal 10,2, nullable)
+- **createdAt**: Timestamp
+
+### Inventory Management
+
+#### InventoryItem
+- **id**: Unique identifier (CUID)
+- **code**: Item code (unique per company)
+- **name**: Item name
+- **description**: Item description (nullable)
+- **category**: Item category (tools, feed, supplements, vitamins, medicines, vaccines, fertilizer, custom)
+- **customCategory**: Custom category name (nullable)
+- **unit**: Unit of measurement
+- **minimumStock**: Minimum stock level (Decimal 10,2)
+- **unitPrice**: Unit price (Decimal 10,2, nullable)
+- **supplierId**: Reference to supplier (nullable)
+- **hasExpiration**: Expiration tracking flag
+- **expirationDate**: Expiration date (nullable)
+- **usageAmount**: Usage amount (Decimal 10,2, nullable)
+- **usageUnit**: Usage unit (nullable)
+- **usageBasis**: Usage basis (per_animal, per_kg, etc., nullable)
+- **companyId**: Reference to company
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### InventoryMovement
+- **id**: Unique identifier (CUID)
+- **itemId**: Reference to inventory item
+- **type**: Movement type (purchase, sale, adjustment, consumption, transfer)
+- **quantity**: Movement quantity (Decimal 10,2)
+- **unitPrice**: Unit price (Decimal 10,2, nullable)
+- **date**: Movement date
+- **description**: Movement description (nullable)
+- **supplierId**: Reference to supplier (nullable)
+- **cashFlowId**: Reference to cash flow (nullable)
+- **propertyId**: Reference to property
+- **companyId**: Reference to company
+- **locationId**: Reference to location (nullable)
+- **expirationDate**: Expiration date (nullable)
+- **employeeIds**: Employee IDs (JSON array, nullable)
+- **serviceProviderIds**: Service provider IDs (JSON array, nullable)
+- **observation**: Movement observation (nullable)
+- **fileIds**: File attachment IDs (JSON array, nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Movement Tracking
+
+#### AnimalMovement
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **locationId**: Reference to location (nullable)
+- **animalIds**: Animal IDs (JSON array)
+- **employeeIds**: Employee IDs (JSON array, nullable)
+- **serviceProviderIds**: Service provider IDs (JSON array, nullable)
+- **date**: Movement date
+- **observation**: Movement observation (nullable)
+- **fileIds**: File attachment IDs (JSON array, nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### LocationMovement
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **propertyId**: Reference to property
+- **locationIds**: Location IDs (JSON array)
+- **employeeIds**: Employee IDs (JSON array, nullable)
+- **serviceProviderIds**: Service provider IDs (JSON array, nullable)
+- **type**: Movement type
+- **date**: Movement date
+- **observation**: Movement observation (nullable)
+- **fileIds**: File attachment IDs (JSON array, nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Financial Management
+
+#### CashFlow
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **type**: Cash flow type (income, expense)
+- **amount**: Amount (Decimal 10,2)
+- **date**: Cash flow date
+- **description**: Description (nullable)
+- **category**: Category (nullable)
+- **paymentMethod**: Payment method (nullable)
+- **status**: Status (completed, pending, cancelled)
+- **bankAccountId**: Reference to bank account (nullable)
+- **propertyId**: Reference to property (nullable)
+- **employeeId**: Reference to employee (nullable)
+- **serviceProviderId**: Reference to service provider (nullable)
+- **supplierId**: Reference to supplier (nullable)
+- **buyerId**: Reference to buyer (nullable)
+- **paymentDate**: Payment date (nullable)
+- **referenceNumber**: Reference number (nullable)
+- **linkedSaleId**: Reference to sale (nullable)
+- **linkedAcquisitionId**: Reference to acquisition (nullable)
+- **observation**: Cash flow observation (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### AccountsPayable
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **supplierId**: Reference to supplier (nullable)
+- **amount**: Amount (Decimal 10,2)
+- **dueDate**: Due date
+- **description**: Description (nullable)
+- **category**: Category (nullable)
+- **paymentMethod**: Payment method (nullable)
+- **status**: Status (unpaid, paid, overdue, partial, cancelled)
+- **bankAccountId**: Reference to bank account (nullable)
+- **propertyId**: Reference to property (nullable)
+- **employeeId**: Reference to employee (nullable)
+- **serviceProviderId**: Reference to service provider (nullable)
+- **paidDate**: Paid date (nullable)
+- **paidAmount**: Paid amount (Decimal 10,2, nullable)
+- **referenceNumber**: Reference number (nullable)
+- **linkedAcquisitionId**: Reference to acquisition (nullable)
+- **observation**: Accounts payable observation (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### AccountsReceivable
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **buyerId**: Reference to buyer (nullable)
+- **amount**: Amount (Decimal 10,2)
+- **dueDate**: Due date
+- **description**: Description (nullable)
+- **category**: Category (nullable)
+- **paymentMethod**: Payment method (nullable)
+- **status**: Status (unpaid, paid, overdue, partial, cancelled)
+- **bankAccountId**: Reference to bank account (nullable)
+- **propertyId**: Reference to property (nullable)
+- **paidDate**: Paid date (nullable)
+- **paidAmount**: Paid amount (Decimal 10,2, nullable)
+- **referenceNumber**: Reference number (nullable)
+- **linkedSaleId**: Reference to sale (nullable)
+- **observation**: Accounts receivable observation (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### BankAccount
+- **id**: Unique identifier (CUID)
+- **companyId**: Reference to company
+- **bankName**: Bank name
+- **bankCode**: Bank code
+- **branch**: Branch number
+- **accountNumber**: Account number
+- **accountType**: Account type (checking, savings, investment)
+- **accountHolderName**: Account holder name (nullable)
+- **status**: Status (active, inactive)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### People & Relationships Management
+
+#### Employee
+- **id**: Unique identifier (CUID)
+- **code**: Employee code (unique per company)
+- **name**: Employee name
+- **cpf**: CPF number (nullable)
+- **email**: Email address (nullable)
+- **phone**: Phone number (nullable)
+- **status**: Status (active, inactive)
+- **companyId**: Reference to company
+- **address**: Complete address information (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### ServiceProvider
+- **id**: Unique identifier (CUID)
+- **code**: Service provider code (unique per company)
+- **name**: Service provider name
+- **cpf**: CPF number (nullable)
+- **cnpj**: CNPJ number (nullable)
+- **email**: Email address (nullable)
+- **phone**: Phone number (nullable)
+- **status**: Status (active, inactive)
+- **companyId**: Reference to company
+- **address**: Complete address information (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Supplier
+- **id**: Unique identifier (CUID)
+- **code**: Supplier code (unique per company)
+- **name**: Supplier name
+- **cpf**: CPF number (nullable)
+- **cnpj**: CNPJ number (nullable)
+- **email**: Email address (nullable)
+- **phone**: Phone number (nullable)
+- **status**: Status (active, inactive)
+- **companyId**: Reference to company
+- **address**: Complete address information (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+#### Buyer
+- **id**: Unique identifier (CUID)
+- **code**: Buyer code (unique per company)
+- **name**: Buyer name
+- **cpf**: CPF number (nullable)
+- **cnpj**: CNPJ number (nullable)
+- **email**: Email address (nullable)
+- **phone**: Phone number (nullable)
+- **status**: Status (active, inactive)
+- **companyId**: Reference to company
+- **address**: Complete address information (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+### Observations System
+
+All observation models follow the same structure:
+- **id**: Unique identifier (CUID)
+- **{entity}Id**: Reference to the entity
+- **observation**: Observation text
+- **fileIds**: File attachment IDs (JSON array, nullable)
+- **companyId**: Reference to company
+- **createdBy**: Creator user ID (nullable)
+- **deletedAt**: Soft delete timestamp (nullable)
+- **createdAt/updatedAt**: Timestamps
+
+Available observation models:
+- **AnimalObservation**: Animal observations
+- **BuyerObservation**: Buyer observations
+- **EmployeeObservation**: Employee observations
+- **InventoryObservation**: Inventory item observations
+- **LocationObservation**: Location observations
+- **ServiceProviderObservation**: Service provider observations
+- **SupplierObservation**: Supplier observations
+- **CashFlowObservation**: Cash flow observations
+- **AccountsPayableObservation**: Accounts payable observations
+- **AccountsReceivableObservation**: Accounts receivable observations
+
+### Junction Tables
+
+The schema includes several junction tables for many-to-many relationships:
+- **EmployeeProperty**: Employee-Property associations
+- **ServiceProviderProperty**: ServiceProvider-Property associations
+- **SupplierProperty**: Supplier-Property associations
+- **BuyerProperty**: Buyer-Property associations
+- **InventoryItemProperty**: InventoryItem-Property associations
 
 ### Seeded Data
 The database comes pre-populated with four pricing plans:

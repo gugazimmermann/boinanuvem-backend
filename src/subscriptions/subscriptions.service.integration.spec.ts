@@ -1,12 +1,13 @@
 import { SubscriptionsService } from './subscriptions.service';
+import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   describeOrSkip,
   setupIntegrationTest,
   teardownIntegrationTest,
-  createServiceTestingModule,
-  getServiceFromModule,
   IntegrationTestContext,
 } from '../../test/integration-test-helpers';
+import { PrismaService } from '../common/services/prisma.service';
 
 describeOrSkip('SubscriptionsService Integration Tests', () => {
   let service: SubscriptionsService;
@@ -69,11 +70,25 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    const module = await createServiceTestingModule(
-      SubscriptionsService,
-      context.prisma,
-    );
-    service = getServiceFromModule(module, SubscriptionsService);
+    const mockConfigService = {
+      get: jest.fn().mockReturnValue(null), // No Stripe key for integration tests
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SubscriptionsService,
+        {
+          provide: PrismaService,
+          useValue: context.prisma,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+      ],
+    }).compile();
+
+    service = module.get<SubscriptionsService>(SubscriptionsService);
 
     // Clean up existing test subscriptions
     await context.prisma.companySubscription.deleteMany({
@@ -492,6 +507,67 @@ describeOrSkip('SubscriptionsService Integration Tests', () => {
       expect(result.isWithinLimits.locations).toBeDefined();
       expect(result.isWithinLimits.animals).toBeDefined();
       expect(result.isWithinLimits.members).toBeDefined();
+    });
+  });
+
+  describe('Error handling with Stripe operations', () => {
+    it('should handle getStripeSubscriptionItemId gracefully when Stripe is not configured', async () => {
+      // Service is already created without Stripe (mockConfigService returns null)
+      // Set stripe to null to ensure it's not configured
+      (service as any).stripe = null;
+
+      // Should return undefined without throwing
+      const result = await (service as any).getStripeSubscriptionItemId(
+        'sub_test_123',
+      );
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle errors in getStripeSubscriptionItemId without crashing', async () => {
+      const loggerSpy = jest.spyOn((service as any).logger, 'warn');
+
+      // Mock Stripe to throw an error
+      const mockStripe = {
+        subscriptions: {
+          retrieve: jest.fn().mockRejectedValue(new Error('API Error')),
+        },
+      };
+      (service as any).stripe = mockStripe;
+
+      const result = await (service as any).getStripeSubscriptionItemId(
+        'sub_test_123',
+      );
+
+      expect(result).toBeUndefined();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to retrieve Stripe subscription item ID:',
+        ),
+      );
+    });
+
+    it('should handle non-Error objects in error logging', async () => {
+      const loggerSpy = jest.spyOn((service as any).logger, 'warn');
+
+      // Mock Stripe to throw a non-Error object
+      const mockStripe = {
+        subscriptions: {
+          retrieve: jest.fn().mockRejectedValue({ code: 'api_error' }),
+        },
+      };
+      (service as any).stripe = mockStripe;
+
+      const result = await (service as any).getStripeSubscriptionItemId(
+        'sub_test_123',
+      );
+
+      expect(result).toBeUndefined();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to retrieve Stripe subscription item ID:',
+        ),
+      );
     });
   });
 });
