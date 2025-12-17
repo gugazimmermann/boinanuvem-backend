@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import * as Express from 'express';
 import { AppModule } from './app.module';
 import { FileLoggerService } from './common/logger/file-logger.service';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const fileLogger = new FileLoggerService();
@@ -71,6 +72,9 @@ async function bootstrap() {
       disableErrorMessages: configService.get('NODE_ENV') === 'production',
     }),
   );
+
+  // Ensure we always return JSON and include requestId for debugging.
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const requestConfig = configService.get('security.request') as {
     timeout: number;
