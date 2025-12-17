@@ -91,6 +91,29 @@ export class AnimalsController {
     return this.animalsService.findOne(user.id, id);
   }
 
+  @Get(':id/acquisition')
+  @RequirePermissions({
+    section: 'registration',
+    resource: 'animals',
+    action: 'view',
+  })
+  @ApiOperation({
+    summary:
+      'Get acquisition data for an animal (works even without acquisitions permission)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Acquisition data retrieved successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Animal not found' })
+  async findAcquisitionForAnimal(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.animalsService.findAcquisitionForAnimal(user.id, id);
+  }
+
   @Put(':id')
   @RequirePermissions({
     section: 'registration',

@@ -20,55 +20,89 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request & { requestId?: string }>();
 
-    const isHttpException = exception instanceof HttpException;
-    const status = isHttpException
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-
-    const env = process.env.NODE_ENV ?? 'development';
-    const isProduction = env === 'production';
-
-    // Try to preserve Nest's built-in HttpException response body when available.
-    const httpBody = isHttpException ? exception.getResponse() : undefined;
-
-    let message: string | string[] = 'Internal server error';
-    if (!isProduction) {
-      if (isHttpException) {
-        // Nest may return string or object for getResponse()
-        if (typeof httpBody === 'string') {
-          message = httpBody;
-        } else if (httpBody && typeof httpBody === 'object') {
-          const m = (httpBody as Record<string, unknown>).message;
-          if (typeof m === 'string' || Array.isArray(m)) {
-            message = m as string | string[];
-          } else {
-            message = exception.message || 'Request failed';
-          }
-        } else {
-          message = exception.message || 'Request failed';
-        }
-      } else if (exception instanceof Error) {
-        message = exception.message || 'Internal server error';
-      }
-    }
-
-    const payload: Record<string, unknown> = {
-      statusCode: status,
-      message,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-    };
+    const status = this.getStatusCode(exception);
+    const message = this.getMessage(exception);
+    const payload = this.buildPayload(status, message, request);
 
     if (request.requestId) {
       payload.requestId = request.requestId;
       response.setHeader('x-request-id', request.requestId);
     }
 
-    // Include stack trace only in non-production for easier local debugging.
-    if (!isProduction && exception instanceof Error && exception.stack) {
-      payload.stack = exception.stack;
-    }
+    this.addStackTraceIfNeeded(payload, exception);
 
     response.status(status).json(payload);
+  }
+
+  private getStatusCode(exception: unknown): number {
+    if (exception instanceof HttpException) {
+      return exception.getStatus();
+    }
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  private getMessage(exception: unknown): string | string[] {
+    const isProduction = this.isProduction();
+    if (isProduction) {
+      return 'Internal server error';
+    }
+
+    if (exception instanceof HttpException) {
+      return this.getHttpExceptionMessage(exception);
+    }
+
+    if (exception instanceof Error) {
+      return exception.message ?? 'Internal server error';
+    }
+
+    return 'Internal server error';
+  }
+
+  private getHttpExceptionMessage(exception: HttpException): string | string[] {
+    const httpBody = exception.getResponse();
+
+    if (typeof httpBody === 'string') {
+      return httpBody;
+    }
+
+    if (httpBody && typeof httpBody === 'object') {
+      const m = (httpBody as Record<string, unknown>).message;
+      if (typeof m === 'string' || Array.isArray(m)) {
+        return m as string | string[];
+      }
+    }
+
+    return exception.message ?? 'Request failed';
+  }
+
+  private buildPayload(
+    status: number,
+    message: string | string[],
+    request: Request,
+  ): Record<string, unknown> {
+    return {
+      statusCode: status,
+      message,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    };
+  }
+
+  private addStackTraceIfNeeded(
+    payload: Record<string, unknown>,
+    exception: unknown,
+  ): void {
+    if (this.isProduction()) {
+      return;
+    }
+
+    if (exception instanceof Error && exception.stack) {
+      payload.stack = exception.stack;
+    }
+  }
+
+  private isProduction(): boolean {
+    const env = process.env.NODE_ENV ?? 'development';
+    return env === 'production';
   }
 }

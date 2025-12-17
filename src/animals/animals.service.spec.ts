@@ -54,6 +54,9 @@ describe('AnimalsService', () => {
       property: {
         findFirst: jest.fn(),
       },
+      acquisitionItem: {
+        findFirst: jest.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -797,6 +800,242 @@ describe('AnimalsService', () => {
       expect(result.propertyId).toBe(mockAnimal.propertyId);
       expect(result.createdAt).toBe(mockAnimal.createdAt);
       expect(result.updatedAt).toBe(mockAnimal.updatedAt);
+    });
+  });
+
+  describe('findAcquisitionForAnimal', () => {
+    const mockAcquisitionItem = {
+      id: 'acq-item-1',
+      animalId: 'animal-1',
+      acquisition: {
+        id: 'acq-1',
+        companyId: 'company-1',
+        propertyId: 'property-1',
+        supplierId: 'supplier-1',
+        acquisitionDate: new Date('2020-01-15'),
+        pricingMode: 'per_animal',
+        paymentMethod: 'cash',
+        totalPrice: 10000,
+        fees: [{ id: 'fee-1', name: 'Transport', amount: 500 }],
+        transportationFee: 200,
+        handlingFee: 100,
+        linkedCashFlowId: 'cashflow-1',
+        linkedAccountsPayableId: 'ap-1',
+        observation: 'Test observation',
+        acquisitionItems: [
+          {
+            id: 'acq-item-1',
+            animalId: 'animal-1',
+            price: 5000,
+            weight: 350,
+            costPerArroba: 142.86,
+            breed: 'nelore',
+            gender: 'male',
+            birthDate: new Date('2019-01-15'),
+            motherId: 'mother-1',
+            fatherId: 'father-1',
+            motherRegistrationNumber: 'M001',
+            fatherRegistrationNumber: 'F001',
+            purity: 'po',
+            birthObservation: 'Birth obs',
+            createdAt: new Date('2020-01-15'),
+          },
+        ],
+        createdAt: new Date('2020-01-15'),
+        updatedAt: new Date('2020-01-15'),
+      },
+    };
+
+    it('should return acquisition data for animal', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(
+        mockAcquisitionItem,
+      );
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result).toBeDefined();
+      expect(result?.id).toBe('acq-1');
+      expect(result?.totalPrice).toBe(10000);
+      expect(result?.acquisitionItems).toHaveLength(1);
+    });
+
+    it('should return null when animal has no acquisition', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(null);
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle Decimal values in prices', async () => {
+      const mockDecimal = {
+        toNumber: jest.fn().mockReturnValue(5000),
+      };
+      const itemWithDecimal = {
+        ...mockAcquisitionItem,
+        acquisition: {
+          ...mockAcquisitionItem.acquisition,
+          totalPrice: mockDecimal,
+        },
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(
+        itemWithDecimal,
+      );
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result?.totalPrice).toBe(5000);
+      expect(mockDecimal.toNumber).toHaveBeenCalled();
+    });
+
+    it('should handle string values in prices', async () => {
+      const itemWithString = {
+        ...mockAcquisitionItem,
+        acquisition: {
+          ...mockAcquisitionItem.acquisition,
+          totalPrice: '10000',
+        },
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(itemWithString);
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result?.totalPrice).toBe(10000);
+    });
+
+    it('should handle null fees', async () => {
+      const itemWithNullFees = {
+        ...mockAcquisitionItem,
+        acquisition: {
+          ...mockAcquisitionItem.acquisition,
+          fees: null,
+        },
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(
+        itemWithNullFees,
+      );
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result?.fees).toBeUndefined();
+    });
+
+    it('should transform acquisition items correctly', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(mockAnimal);
+      prismaService.acquisitionItem.findFirst.mockResolvedValue(
+        mockAcquisitionItem,
+      );
+
+      const result = await service.findAcquisitionForAnimal(
+        mockUser.id,
+        mockAnimal.id,
+      );
+
+      expect(result?.acquisitionItems[0]).toMatchObject({
+        id: 'acq-item-1',
+        animalId: 'animal-1',
+        price: 5000,
+        weight: 350,
+        costPerArroba: 142.86,
+        breed: 'nelore',
+        gender: 'male',
+        motherId: 'mother-1',
+        fatherId: 'father-1',
+      });
+    });
+
+    it('should throw NotFoundException if animal not found', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.animal.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.findAcquisitionForAnimal(mockUser.id, 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('toNumber', () => {
+    it('should return number for number input', () => {
+      const result = (service as any).toNumber(42);
+      expect(result).toBe(42);
+    });
+
+    it('should return undefined for null', () => {
+      const result = (service as any).toNumber(null);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for undefined', () => {
+      const result = (service as any).toNumber(undefined);
+      expect(result).toBeUndefined();
+    });
+
+    it('should parse string to number', () => {
+      const result = (service as any).toNumber('123.45');
+      expect(result).toBe(123.45);
+    });
+
+    it('should return undefined for invalid string', () => {
+      const result = (service as any).toNumber('not-a-number');
+      expect(result).toBeUndefined();
+    });
+
+    it('should call toNumber method on object', () => {
+      const mockDecimal = {
+        toNumber: jest.fn().mockReturnValue(100),
+      };
+      const result = (service as any).toNumber(mockDecimal);
+      expect(result).toBe(100);
+      expect(mockDecimal.toNumber).toHaveBeenCalled();
+    });
+
+    it('should parse bigint to number', () => {
+      const result = (service as any).toNumber(BigInt(123));
+      expect(result).toBe(123);
+    });
+
+    it('should convert boolean true to 1', () => {
+      const result = (service as any).toNumber(true);
+      expect(result).toBe(1);
+    });
+
+    it('should convert boolean false to 0', () => {
+      const result = (service as any).toNumber(false);
+      expect(result).toBe(0);
+    });
+
+    it('should return undefined for objects without toNumber', () => {
+      const result = (service as any).toNumber({ some: 'object' });
+      expect(result).toBeUndefined();
     });
   });
 });

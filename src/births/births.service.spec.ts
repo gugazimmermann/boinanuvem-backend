@@ -87,6 +87,9 @@ describe('BirthsService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      acquisitionItem: {
+        findUnique: jest.fn(),
+      },
       property: {
         findFirst: jest.fn(),
       },
@@ -303,6 +306,281 @@ describe('BirthsService', () => {
       const result = await service.create(mockUser.id, dtoWithoutPurity);
 
       expect(result).toBeDefined();
+    });
+
+    it('should set breed to undefined when parents are PO with different breeds (F1 crossbreed)', async () => {
+      const dtoWithoutBreedAndPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        breed: undefined,
+        purity: undefined,
+      };
+
+      const motherBirth = {
+        ...mockBirth,
+        id: 'mother-birth-1',
+        animalId: 'mother-1',
+        purity: 'po',
+        breed: 'red_angus',
+      };
+
+      const fatherBirth = {
+        ...mockBirth,
+        id: 'father-birth-1',
+        animalId: 'father-1',
+        purity: 'po',
+        breed: 'nelore',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      // Order: validate mother, validate father, check existing code
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother) // Validate mother
+        .mockResolvedValueOnce(mockFather) // Validate father
+        .mockResolvedValueOnce(null); // Check for existing animal code
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(motherBirth) // Mother birth: Red Angus PO
+        .mockResolvedValueOnce(fatherBirth); // Father birth: Nelore PO
+
+      let createdBirth: any;
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        const tx = {
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockImplementation((args) => {
+              createdBirth = args.data;
+              return Promise.resolve({
+                ...mockBirth,
+                ...args.data,
+              });
+            }),
+          },
+        };
+        return callback(tx);
+      });
+
+      await service.create(mockUser.id, dtoWithoutBreedAndPurity);
+
+      // Verify that breed is undefined for F1 crossbreed
+      expect(createdBirth.purity).toBe('f1');
+      expect(createdBirth.breed).toBeNull();
+    });
+
+    it('should return F1 when parents are acquired animals (acquisitionItem) with different breeds', async () => {
+      const dtoWithoutBreedAndPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        breed: undefined,
+        purity: undefined,
+        motherId: 'mother-1',
+        fatherId: 'father-1',
+      };
+
+      const motherAcquisitionItem = {
+        id: 'acq-item-mother-1',
+        animalId: 'mother-1',
+        acquisitionId: 'acq-1',
+        price: 5000,
+        weight: 350,
+        costPerArroba: 142.86,
+        breed: 'red_angus',
+        purity: 'po',
+        gender: 'female',
+      };
+
+      const fatherAcquisitionItem = {
+        id: 'acq-item-father-1',
+        animalId: 'father-1',
+        acquisitionId: 'acq-1',
+        price: 6000,
+        weight: 450,
+        costPerArroba: 133.33,
+        breed: 'nelore',
+        purity: 'po',
+        gender: 'male',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      // Order: validate mother, validate father, check existing code
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother) // Validate mother
+        .mockResolvedValueOnce(mockFather) // Validate father
+        .mockResolvedValueOnce(null); // Check for existing animal code
+      // No birth records for acquired animals
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(null) // No mother birth
+        .mockResolvedValueOnce(null); // No father birth
+      // But they have acquisitionItems
+      prismaService.acquisitionItem.findUnique
+        .mockResolvedValueOnce(motherAcquisitionItem) // Mother acquisitionItem: Red Angus PO
+        .mockResolvedValueOnce(fatherAcquisitionItem); // Father acquisitionItem: Nelore PO
+
+      let createdBirth: any;
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        const tx = {
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockImplementation((args) => {
+              createdBirth = args.data;
+              return Promise.resolve({
+                ...mockBirth,
+                ...args.data,
+              });
+            }),
+          },
+        };
+        return callback(tx);
+      });
+
+      await service.create(mockUser.id, dtoWithoutBreedAndPurity);
+
+      // Verify that purity is F1 for crossbreed from acquired animals
+      expect(createdBirth.purity).toBe('f1');
+      expect(createdBirth.breed).toBeNull();
+    });
+
+    it('should use breed from birth when available, acquisitionItem as fallback', async () => {
+      const dtoWithoutBreedAndPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        breed: undefined,
+        purity: undefined,
+        motherId: 'mother-1',
+        fatherId: 'father-1',
+      };
+
+      const motherBirth = {
+        ...mockBirth,
+        id: 'mother-birth-1',
+        animalId: 'mother-1',
+        purity: 'po',
+        breed: 'red_angus',
+      };
+
+      const fatherAcquisitionItem = {
+        id: 'acq-item-father-1',
+        animalId: 'father-1',
+        acquisitionId: 'acq-1',
+        price: 6000,
+        weight: 450,
+        costPerArroba: 133.33,
+        breed: 'nelore',
+        purity: 'po',
+        gender: 'male',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother)
+        .mockResolvedValueOnce(mockFather)
+        .mockResolvedValueOnce(null);
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(motherBirth) // Mother has birth record
+        .mockResolvedValueOnce(null); // Father has no birth record
+      prismaService.acquisitionItem.findUnique.mockResolvedValueOnce(
+        fatherAcquisitionItem,
+      ); // Father has acquisitionItem
+
+      let createdBirth: any;
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        const tx = {
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockImplementation((args) => {
+              createdBirth = args.data;
+              return Promise.resolve({
+                ...mockBirth,
+                ...args.data,
+              });
+            }),
+          },
+        };
+        return callback(tx);
+      });
+
+      await service.create(mockUser.id, dtoWithoutBreedAndPurity);
+
+      // Should be F1 because mother is Red Angus and father is Nelore
+      expect(createdBirth.purity).toBe('f1');
+      expect(createdBirth.breed).toBeNull();
+    });
+
+    it('should return F1 when parents are acquired animals without purity, with different breeds', async () => {
+      const dtoWithoutBreedAndPurity: CreateBirthDto = {
+        ...mockCreateBirthDto,
+        breed: undefined,
+        purity: undefined,
+        motherId: 'mother-1',
+        fatherId: 'father-1',
+      };
+
+      const motherAcquisitionItem = {
+        id: 'acq-item-mother-1',
+        animalId: 'mother-1',
+        acquisitionId: 'acq-1',
+        price: 5000,
+        weight: 350,
+        costPerArroba: 142.86,
+        breed: 'red_angus',
+        purity: null, // No purity in acquisitionItem
+        gender: 'female',
+      };
+
+      const fatherAcquisitionItem = {
+        id: 'acq-item-father-1',
+        animalId: 'father-1',
+        acquisitionId: 'acq-1',
+        price: 6000,
+        weight: 450,
+        costPerArroba: 133.33,
+        breed: 'nelore',
+        purity: null, // No purity in acquisitionItem
+        gender: 'male',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(mockProperty);
+      prismaService.animal.findFirst
+        .mockResolvedValueOnce(mockMother)
+        .mockResolvedValueOnce(mockFather)
+        .mockResolvedValueOnce(null);
+      prismaService.birth.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      prismaService.acquisitionItem.findUnique
+        .mockResolvedValueOnce(motherAcquisitionItem)
+        .mockResolvedValueOnce(fatherAcquisitionItem);
+
+      let createdBirth: any;
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        const tx = {
+          animal: {
+            create: jest.fn().mockResolvedValue(mockAnimal),
+          },
+          birth: {
+            create: jest.fn().mockImplementation((args) => {
+              createdBirth = args.data;
+              return Promise.resolve({
+                ...mockBirth,
+                ...args.data,
+              });
+            }),
+          },
+        };
+        return callback(tx);
+      });
+
+      await service.create(mockUser.id, dtoWithoutBreedAndPurity);
+
+      // Should be F1 because mother is Red Angus and father is Nelore (both assumed PO as default)
+      expect(createdBirth.purity).toBe('f1');
+      expect(createdBirth.breed).toBeNull();
     });
   });
 
@@ -700,6 +978,54 @@ describe('BirthsService', () => {
         fatherBirth,
         'nelore',
         'nelore',
+      );
+      expect(purity).toBe(BirthPurity.PO);
+    });
+
+    it('should return F1 when father is Nelore PO and mother is Red Angus PO', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(
+        motherBirth,
+        fatherBirth,
+        'red_angus',
+        'nelore',
+      );
+      expect(purity).toBe(BirthPurity.F1);
+    });
+
+    it('should return F1 when father is Red Angus PO and mother is Nelore PO', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(
+        motherBirth,
+        fatherBirth,
+        'nelore',
+        'red_angus',
+      );
+      expect(purity).toBe(BirthPurity.F1);
+    });
+
+    it('should return PO when both parents are PO but one breed is undefined', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(
+        motherBirth,
+        fatherBirth,
+        'nelore',
+        undefined,
+      );
+      expect(purity).toBe(BirthPurity.PO);
+    });
+
+    it('should return PO when both parents are PO but both breeds are undefined', () => {
+      const motherBirth = { purity: BirthPurity.PO };
+      const fatherBirth = { purity: BirthPurity.PO };
+      const purity = (service as any).calculatePurity(
+        motherBirth,
+        fatherBirth,
+        undefined,
+        undefined,
       );
       expect(purity).toBe(BirthPurity.PO);
     });

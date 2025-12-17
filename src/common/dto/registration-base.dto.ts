@@ -9,7 +9,7 @@ import {
   IsEmail,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { formatCPF, formatCNPJ } from '../utils/format-utils';
+import { normalizeCPF, normalizeCNPJ } from '../utils/format-utils';
 import { AddressDto } from './address.dto';
 
 type OptionalString = string | null | undefined;
@@ -29,7 +29,7 @@ export class BaseRegistrationCreateDto extends AddressDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: unknown }) =>
-    formatCPF(value as OptionalString),
+    normalizeCPF(value as OptionalString),
   )
   cpf?: string;
 
@@ -37,7 +37,7 @@ export class BaseRegistrationCreateDto extends AddressDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: unknown }) =>
-    formatCNPJ(value as string | null | undefined),
+    normalizeCNPJ(value as string | null | undefined),
   )
   cnpj?: string;
 

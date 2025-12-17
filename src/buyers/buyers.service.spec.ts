@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 import { BuyersService } from './buyers.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateBuyerDto, UpdateBuyerDto } from './dto';
@@ -17,8 +17,8 @@ describe('BuyersService', () => {
     id: 'buyer-1',
     code: '001',
     name: 'Comprador de Gado LTDA',
-    cpf: '123.456.789-00',
-    cnpj: '12.345.678/0001-90',
+    cpf: '12345678900',
+    cnpj: null,
     email: 'contato@comprador.com',
     phone: '(47) 99999-9999',
     status: 'active',
@@ -39,8 +39,8 @@ describe('BuyersService', () => {
   const mockCreateBuyerDto: CreateBuyerDto = {
     code: '001',
     name: 'Comprador de Gado LTDA',
-    cpf: '123.456.789-00',
-    cnpj: '12.345.678/0001-90',
+    cpf: '12345678900',
+    cnpj: undefined,
     email: 'contato@comprador.com',
     phone: '(47) 99999-9999',
     status: 'active',
@@ -116,6 +116,63 @@ describe('BuyersService', () => {
         service.create(mockUser.id, mockCreateBuyerDto),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should throw BadRequestException when both CPF and CNPJ are provided', async () => {
+      const dtoWithBoth: CreateBuyerDto = {
+        ...mockCreateBuyerDto,
+        code: '003',
+        cpf: '12345678900',
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      prismaService.buyer.findFirst.mockResolvedValue(null);
+
+      await expect(service.create(mockUser.id, dtoWithBoth)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException when neither CPF nor CNPJ is provided', async () => {
+      const dtoWithoutBoth: CreateBuyerDto = {
+        ...mockCreateBuyerDto,
+        code: '004',
+        cpf: undefined,
+        cnpj: undefined,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      prismaService.buyer.findFirst.mockResolvedValue(null);
+
+      await expect(service.create(mockUser.id, dtoWithoutBoth)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should create successfully with only CNPJ', async () => {
+      const dtoWithCnpj: CreateBuyerDto = {
+        ...mockCreateBuyerDto,
+        code: '005',
+        cpf: undefined,
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      prismaService.buyer.findFirst.mockResolvedValue(null);
+      prismaService.buyer.create.mockResolvedValue({
+        ...mockBuyer,
+        cpf: null,
+        cnpj: '12345678000190',
+      });
+
+      const result = await service.create(mockUser.id, dtoWithCnpj);
+
+      expect(result).toBeDefined();
+      expect(result.cnpj).toBe('12345678000190');
+    });
   });
 
   describe('findAll', () => {
@@ -156,6 +213,59 @@ describe('BuyersService', () => {
       const result = await service.update(mockUser.id, mockBuyer.id, updateDto);
 
       expect(result.name).toBe(updateDto.name);
+    });
+
+    it('should throw BadRequestException when updating to have both CPF and CNPJ', async () => {
+      const updateDto: UpdateBuyerDto = {
+        cpf: '12345678900',
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.buyer.findFirst.mockResolvedValue(mockBuyer);
+
+      await expect(
+        service.update(mockUser.id, mockBuyer.id, updateDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when updating to have neither CPF nor CNPJ', async () => {
+      const updateDto: UpdateBuyerDto = {
+        cpf: null,
+        cnpj: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.buyer.findFirst.mockResolvedValue({
+        ...mockBuyer,
+        cpf: null,
+        cnpj: null,
+      });
+
+      await expect(
+        service.update(mockUser.id, mockBuyer.id, updateDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update successfully when changing from CPF to CNPJ', async () => {
+      const updateDto: UpdateBuyerDto = {
+        cpf: null,
+        cnpj: '12345678000190',
+      };
+      const updatedBuyer = {
+        ...mockBuyer,
+        cpf: null,
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.buyer.findFirst.mockResolvedValue(mockBuyer);
+      prismaService.buyer.update.mockResolvedValue(updatedBuyer);
+      prismaService.buyer.findUnique.mockResolvedValue(updatedBuyer);
+
+      const result = await service.update(mockUser.id, mockBuyer.id, updateDto);
+
+      expect(result).toBeDefined();
     });
   });
 

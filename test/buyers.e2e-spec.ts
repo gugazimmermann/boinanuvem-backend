@@ -62,6 +62,7 @@ describe('Buyers Management Flow (e2e)', () => {
     const createBuyerDto = {
       code: '001',
       name: 'Comprador de Gado LTDA',
+      cpf: '123.456.789-00',
       status: 'active',
       propertyIds: [], // Will be set in each test
     };
@@ -90,7 +91,7 @@ describe('Buyers Management Flow (e2e)', () => {
       const dto = {
         ...createBuyerDto,
         code: '002',
-        cpf: '123.456.789-00',
+        cpf: undefined,
         cnpj: '12.345.678/0001-90',
         email: 'contato@comprador.com',
         phone: '(47) 99999-9999',
@@ -118,6 +119,34 @@ describe('Buyers Management Flow (e2e)', () => {
         email: dto.email,
         phone: dto.phone,
       });
+    });
+
+    it('should fail when both cpf and cnpj are provided', async () => {
+      const dto = {
+        ...createBuyerDto,
+        code: 'BOTH-001',
+        cpf: '123.456.789-00',
+        cnpj: '12.345.678/0001-90',
+        propertyIds: [context.testProperty.id],
+      };
+      await authenticatedRequest(context.app, context.mainUserToken)
+        .post('/buyers')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should fail when neither cpf nor cnpj is provided', async () => {
+      const dto = {
+        ...createBuyerDto,
+        code: 'NONE-001',
+        cpf: undefined,
+        cnpj: undefined,
+        propertyIds: [context.testProperty.id],
+      };
+      await authenticatedRequest(context.app, context.mainUserToken)
+        .post('/buyers')
+        .send(dto)
+        .expect(400);
     });
 
     it('should fail without add permission', async () => {
@@ -295,6 +324,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Buyer 1',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -307,6 +337,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Buyer 2',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -319,6 +350,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Deleted Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           deletedAt: new Date(), // Soft deleted
           properties: {
             create: [{ propertyId: context.testProperty.id }],
@@ -400,6 +432,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -460,6 +493,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -503,6 +537,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Other Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -515,6 +550,42 @@ describe('Buyers Management Flow (e2e)', () => {
         .set('Authorization', `Bearer ${context.mainUserToken}`)
         .send({ code: 'PUT-002' })
         .expect(409);
+    });
+
+    it('should fail when updating to have both CPF and CNPJ', async () => {
+      await request(context.app.getHttpServer())
+        .put(`/buyers/${buyerId}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send({
+          cpf: '123.456.789-00',
+          cnpj: '12.345.678/0001-90',
+        })
+        .expect(400);
+    });
+
+    it('should fail when updating to have neither CPF nor CNPJ', async () => {
+      await request(context.app.getHttpServer())
+        .put(`/buyers/${buyerId}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send({
+          cpf: null,
+          cnpj: null,
+        })
+        .expect(400);
+    });
+
+    it('should update successfully when changing from CPF to CNPJ', async () => {
+      const response = await request(context.app.getHttpServer())
+        .put(`/buyers/${buyerId}`)
+        .set('Authorization', `Bearer ${context.mainUserToken}`)
+        .send({
+          cpf: null,
+          cnpj: '12.345.678/0001-90',
+        })
+        .expect(200);
+
+      expect(response.body.cpf).toBeUndefined();
+      expect(response.body.cnpj).toBe('12345678000190');
     });
   });
 
@@ -536,6 +607,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'Test Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },
@@ -641,6 +713,7 @@ describe('Buyers Management Flow (e2e)', () => {
           name: 'First Company Buyer',
           status: 'active',
           companyId: context.testCompany.id,
+          cpf: '12345678900',
           properties: {
             create: [{ propertyId: context.testProperty.id }],
           },

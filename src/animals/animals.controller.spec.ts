@@ -47,6 +47,7 @@ describe('AnimalsController', () => {
       create: jest.fn(),
       findAll: jest.fn(),
       findOne: jest.fn(),
+      findAcquisitionForAnimal: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
     };
@@ -248,6 +249,91 @@ describe('AnimalsController', () => {
         controller.remove(mockCurrentUser, 'non-existent-id'),
       ).rejects.toThrow(NotFoundException);
       expect(animalsService.remove).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        'non-existent-id',
+      );
+    });
+  });
+
+  describe('findAcquisitionForAnimal', () => {
+    const mockAcquisition = {
+      id: 'acq-1',
+      companyId: 'company-1',
+      propertyId: 'property-1',
+      supplierId: 'supplier-1',
+      acquisitionDate: new Date('2020-01-15'),
+      pricingMode: 'per_animal',
+      paymentMethod: 'cash',
+      totalPrice: 10000,
+      fees: [{ id: 'fee-1', name: 'Transport', amount: 500 }],
+      transportationFee: 200,
+      handlingFee: 100,
+      linkedCashFlowId: 'cashflow-1',
+      linkedAccountsPayableId: 'ap-1',
+      observation: 'Test observation',
+      acquisitionItems: [
+        {
+          id: 'acq-item-1',
+          animalId: 'animal-1',
+          price: 5000,
+          weight: 350,
+          costPerArroba: 142.86,
+          breed: 'nelore',
+          gender: 'male',
+          birthDate: new Date('2019-01-15'),
+          motherId: 'mother-1',
+          fatherId: 'father-1',
+          motherRegistrationNumber: 'M001',
+          fatherRegistrationNumber: 'F001',
+          purity: 'po',
+          birthObservation: 'Birth obs',
+          createdAt: new Date('2020-01-15'),
+        },
+      ],
+      createdAt: new Date('2020-01-15'),
+      updatedAt: new Date('2020-01-15'),
+    };
+
+    it('should return acquisition data for animal', async () => {
+      animalsService.findAcquisitionForAnimal.mockResolvedValue(
+        mockAcquisition,
+      );
+
+      const result = await controller.findAcquisitionForAnimal(
+        mockCurrentUser,
+        mockAnimal.id,
+      );
+
+      expect(animalsService.findAcquisitionForAnimal).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        mockAnimal.id,
+      );
+      expect(result).toEqual(mockAcquisition);
+    });
+
+    it('should return null when animal has no acquisition', async () => {
+      animalsService.findAcquisitionForAnimal.mockResolvedValue(null);
+
+      const result = await controller.findAcquisitionForAnimal(
+        mockCurrentUser,
+        mockAnimal.id,
+      );
+
+      expect(result).toBeNull();
+      expect(animalsService.findAcquisitionForAnimal).toHaveBeenCalledWith(
+        mockCurrentUser.id,
+        mockAnimal.id,
+      );
+    });
+
+    it('should handle NotFoundException when animal not found', async () => {
+      const error = new NotFoundException('Animal not found');
+      animalsService.findAcquisitionForAnimal.mockRejectedValue(error);
+
+      await expect(
+        controller.findAcquisitionForAnimal(mockCurrentUser, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
+      expect(animalsService.findAcquisitionForAnimal).toHaveBeenCalledWith(
         mockCurrentUser.id,
         'non-existent-id',
       );

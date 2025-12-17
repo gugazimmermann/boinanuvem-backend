@@ -65,6 +65,26 @@ export abstract class BaseRegistrationService<T extends RegistrationEntity> {
     protected config: RegistrationEntityConfig,
   ) {}
 
+  protected validateCpfCnpjExclusive({
+    cpf,
+    cnpj,
+  }: {
+    cpf?: string | null;
+    cnpj?: string | null;
+  }): void {
+    const cpfValue = (cpf ?? '').trim();
+    const cnpjValue = (cnpj ?? '').trim();
+    const hasCpf = cpfValue.length > 0;
+    const hasCnpj = cnpjValue.length > 0;
+
+    if (hasCpf === hasCnpj) {
+      // both present or both absent
+      throw new BadRequestException(
+        `Exactly one of CPF or CNPJ must be provided for ${this.config.entityName}`,
+      );
+    }
+  }
+
   async create(userId: string, createDto: BaseRegistrationCreateDto) {
     const companyId = await this.getUserCompanyId(userId);
 
@@ -73,6 +93,12 @@ export abstract class BaseRegistrationService<T extends RegistrationEntity> {
       createDto.propertyIds,
       companyId,
     );
+
+    // With `exactOptionalPropertyTypes`, avoid passing explicit `undefined` to optional props
+    this.validateCpfCnpjExclusive({
+      cpf: createDto.cpf ?? null,
+      cnpj: createDto.cnpj ?? null,
+    });
 
     // Check if code already exists for this company (excluding soft-deleted)
     const existing = await this.findByCode(companyId, createDto.code);
@@ -115,6 +141,13 @@ export abstract class BaseRegistrationService<T extends RegistrationEntity> {
         existing.code,
       );
     }
+
+    // Validate CPF/CNPJ (effective: existing + patch) for base registration entities
+    const effectiveCpf =
+      updateDto.cpf !== undefined ? updateDto.cpf : existing.cpf;
+    const effectiveCnpj =
+      updateDto.cnpj !== undefined ? updateDto.cnpj : existing.cnpj;
+    this.validateCpfCnpjExclusive({ cpf: effectiveCpf, cnpj: effectiveCnpj });
 
     // If propertyIds are being updated, validate them
     if (updateDto.propertyIds) {

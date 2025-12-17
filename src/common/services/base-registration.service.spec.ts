@@ -82,7 +82,7 @@ class TestRegistrationService extends BaseRegistrationService<RegistrationEntity
         id: 'entity-1',
         code: '001',
         name: 'Test Entity',
-        cpf: null,
+        cpf: '12345678900',
         cnpj: null,
         email: null,
         phone: null,
@@ -187,7 +187,7 @@ describe('BaseRegistrationService', () => {
     id: 'entity-1',
     code: '001',
     name: 'Test Entity',
-    cpf: null,
+    cpf: '12345678900',
     cnpj: null,
     email: null,
     phone: null,
@@ -208,6 +208,7 @@ describe('BaseRegistrationService', () => {
   const mockCreateDto: BaseRegistrationCreateDto = {
     code: '001',
     name: 'Test Entity',
+    cpf: '12345678900',
     status: 'active',
     propertyIds: ['property-1'],
   };
@@ -312,6 +313,72 @@ describe('BaseRegistrationService', () => {
       await expect(
         service.create(mockUser.id, dtoWithInvalidProperty),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when both CPF and CNPJ are provided', async () => {
+      const dtoWithBoth: BaseRegistrationCreateDto = {
+        ...mockCreateDto,
+        cpf: '12345678900',
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      jest.spyOn(service as any, 'findByCode').mockResolvedValue(null);
+
+      await expect(service.create(mockUser.id, dtoWithBoth)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException when neither CPF nor CNPJ is provided', async () => {
+      const dtoWithoutBoth: BaseRegistrationCreateDto = {
+        ...mockCreateDto,
+        cpf: undefined,
+        cnpj: undefined,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      jest.spyOn(service as any, 'findByCode').mockResolvedValue(null);
+
+      await expect(service.create(mockUser.id, dtoWithoutBoth)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should create successfully with only CPF', async () => {
+      const dtoWithCpf: BaseRegistrationCreateDto = {
+        ...mockCreateDto,
+        cpf: '12345678900',
+        cnpj: undefined,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      jest.spyOn(service as any, 'findByCode').mockResolvedValue(null);
+
+      const result = await service.create(mockUser.id, dtoWithCpf);
+
+      expect(result).toBeDefined();
+      expect(result.cpf).toBe('12345678900');
+    });
+
+    it('should create successfully with only CNPJ', async () => {
+      const dtoWithCnpj: BaseRegistrationCreateDto = {
+        ...mockCreateDto,
+        cpf: undefined,
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findMany.mockResolvedValue([{ id: 'property-1' }]);
+      jest.spyOn(service as any, 'findByCode').mockResolvedValue(null);
+
+      const result = await service.create(mockUser.id, dtoWithCnpj);
+
+      expect(result).toBeDefined();
+      expect(result.cnpj).toBe('12345678000190');
     });
   });
 
@@ -492,6 +559,104 @@ describe('BaseRegistrationService', () => {
       await expect(
         service.update(mockUser.id, 'entity-1', updateDto),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when updating to have both CPF and CNPJ', async () => {
+      const updateDto: UpdateDto = {
+        cpf: '12345678900',
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest
+        .spyOn(service as any, 'findByIdAndCompany')
+        .mockResolvedValue(mockEntity);
+
+      await expect(
+        service.update(mockUser.id, 'entity-1', updateDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when updating to have neither CPF nor CNPJ', async () => {
+      const updateDto: UpdateDto = {
+        cpf: null,
+        cnpj: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest
+        .spyOn(service as any, 'findByIdAndCompany')
+        .mockResolvedValue({ ...mockEntity, cpf: null, cnpj: null });
+
+      await expect(
+        service.update(mockUser.id, 'entity-1', updateDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update successfully when changing from CPF to CNPJ', async () => {
+      const updateDto: UpdateDto = {
+        cpf: null,
+        cnpj: '12345678000190',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest
+        .spyOn(service as any, 'findByIdAndCompany')
+        .mockResolvedValue({ ...mockEntity, cpf: '12345678900', cnpj: null });
+
+      const result = await service.update(mockUser.id, 'entity-1', updateDto);
+
+      expect(result).toBeDefined();
+    });
+
+    it('should update successfully when changing from CNPJ to CPF', async () => {
+      const updateDto: UpdateDto = {
+        cpf: '12345678900',
+        cnpj: null,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest.spyOn(service as any, 'findByIdAndCompany').mockResolvedValue({
+        ...mockEntity,
+        cpf: null,
+        cnpj: '12345678000190',
+      });
+
+      const result = await service.update(mockUser.id, 'entity-1', updateDto);
+
+      expect(result).toBeDefined();
+    });
+
+    it('should update successfully when keeping existing CPF', async () => {
+      const updateDto: UpdateDto = {
+        name: 'Updated Name',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest
+        .spyOn(service as any, 'findByIdAndCompany')
+        .mockResolvedValue({ ...mockEntity, cpf: '12345678900', cnpj: null });
+
+      const result = await service.update(mockUser.id, 'entity-1', updateDto);
+
+      expect(result).toBeDefined();
+    });
+
+    it('should update successfully when keeping existing CNPJ', async () => {
+      const updateDto: UpdateDto = {
+        name: 'Updated Name',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      jest.spyOn(service as any, 'findByIdAndCompany').mockResolvedValue({
+        ...mockEntity,
+        cpf: null,
+        cnpj: '12345678000190',
+      });
+
+      const result = await service.update(mockUser.id, 'entity-1', updateDto);
+
+      expect(result).toBeDefined();
     });
   });
 
@@ -948,6 +1113,102 @@ describe('BaseRegistrationService', () => {
       expect(result.state).toBe('SP');
       expect(result.zipCode).toBe('01310-100');
       expect(result.propertyIds).toEqual(['property-1']);
+    });
+  });
+
+  describe('validateCpfCnpjExclusive', () => {
+    it('should throw BadRequestException when both CPF and CNPJ are provided', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '12345678900',
+          cnpj: '12345678000190',
+        });
+      }).toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when both CPF and CNPJ are empty strings', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '',
+          cnpj: '',
+        });
+      }).toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when both CPF and CNPJ are null', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: null,
+          cnpj: null,
+        });
+      }).toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when both CPF and CNPJ are undefined', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: undefined,
+          cnpj: undefined,
+        });
+      }).toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when CPF is whitespace and CNPJ is empty', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '   ',
+          cnpj: '',
+        });
+      }).toThrow(BadRequestException);
+    });
+
+    it('should not throw when only CPF is provided', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '12345678900',
+          cnpj: null,
+        });
+      }).not.toThrow();
+    });
+
+    it('should not throw when only CNPJ is provided', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: null,
+          cnpj: '12345678000190',
+        });
+      }).not.toThrow();
+    });
+
+    it('should not throw when CPF is provided and CNPJ is undefined', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '12345678900',
+          cnpj: undefined,
+        });
+      }).not.toThrow();
+    });
+
+    it('should not throw when CNPJ is provided and CPF is undefined', () => {
+      expect(() => {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: undefined,
+          cnpj: '12345678000190',
+        });
+      }).not.toThrow();
+    });
+
+    it('should throw BadRequestException with correct entity name in message', () => {
+      try {
+        (service as any).validateCpfCnpjExclusive({
+          cpf: '12345678900',
+          cnpj: '12345678000190',
+        });
+        fail('Should have thrown BadRequestException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect(error.message).toContain('Buyer');
+      }
     });
   });
 });

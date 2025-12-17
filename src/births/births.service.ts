@@ -4,7 +4,12 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { CreateBirthDto, UpdateBirthDto, BirthPurity } from './dto';
+import {
+  CreateBirthDto,
+  UpdateBirthDto,
+  BirthPurity,
+  AnimalBreed,
+} from './dto';
 
 @Injectable()
 export class BirthsService {
@@ -13,36 +18,51 @@ export class BirthsService {
   async create(userId: string, createBirthDto: CreateBirthDto) {
     const companyId = await this.getUserCompanyId(userId);
 
-    // Validate property belongs to company
     await this.validatePropertyBelongsToCompany(
       createBirthDto.propertyId,
       companyId,
     );
 
-    // Validate mother and father if provided
-    const { motherBirth, fatherBirth, motherBreed, fatherBreed } =
-      await this.processParentAnimals(
-        createBirthDto.motherId,
-        createBirthDto.fatherId,
-        companyId,
-      );
+    const parentData = await this.processParentAnimals(
+      createBirthDto.motherId,
+      createBirthDto.fatherId,
+      companyId,
+    );
 
-    // Calculate purity if not provided
-    let purity = createBirthDto.purity;
-    if (!purity) {
-      purity = this.calculatePurity(
-        motherBirth,
-        fatherBirth,
-        motherBreed,
-        fatherBreed,
-      );
-    }
+    const purity = this.calculatePurity(
+      parentData.motherBirth,
+      parentData.fatherBirth,
+      parentData.motherBreed,
+      parentData.fatherBreed,
+    );
 
-    // Check if animal code already exists
+    const breed = this.calculateBreed(
+      createBirthDto.breed,
+      purity,
+      parentData.motherBreed,
+      parentData.fatherBreed,
+    );
+
+    await this.validateAnimalCodeNotExists(companyId, createBirthDto.code);
+
+    const result = await this.createAnimalAndBirth(
+      createBirthDto,
+      companyId,
+      breed,
+      purity,
+    );
+
+    return this.transformBirth(result);
+  }
+
+  private async validateAnimalCodeNotExists(
+    companyId: string,
+    code: string,
+  ): Promise<void> {
     const existingAnimal = await this.prisma.animal.findFirst({
       where: {
         companyId,
-        code: createBirthDto.code,
+        code,
         deletedAt: null,
       },
     });
@@ -52,27 +72,54 @@ export class BirthsService {
         'Animal with this code already exists for your company',
       );
     }
+  }
 
-    // Create animal and birth in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Create the animal
+  private calculateBreed(
+    providedBreed: AnimalBreed | undefined,
+    purity: BirthPurity,
+    motherBreed?: string,
+    fatherBreed?: string,
+  ): AnimalBreed | undefined {
+    if (providedBreed) {
+      return providedBreed;
+    }
+
+    if (
+      purity === BirthPurity.F1 &&
+      motherBreed &&
+      fatherBreed &&
+      motherBreed !== fatherBreed
+    ) {
+      return undefined; // F1 crossbreed has no specific breed
+    }
+
+    const calculatedBreed = fatherBreed ?? motherBreed;
+    return calculatedBreed ? (calculatedBreed as AnimalBreed) : undefined;
+  }
+
+  private async createAnimalAndBirth(
+    createBirthDto: CreateBirthDto,
+    companyId: string,
+    breed: AnimalBreed | undefined,
+    purity: BirthPurity,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
       const animal = await tx.animal.create({
         data: {
           code: createBirthDto.code,
           registrationNumber: createBirthDto.registrationNumber,
-          acquisitionDate: new Date(createBirthDto.birthDate),
+          acquisitionDate: null,
           status: 'active',
           companyId,
           propertyId: createBirthDto.propertyId,
         },
       });
 
-      // Create the birth record
       const birth = await tx.birth.create({
         data: {
           animalId: animal.id,
           birthDate: new Date(createBirthDto.birthDate),
-          breed: createBirthDto.breed ?? null,
+          breed: breed ?? null,
           gender: createBirthDto.gender ?? null,
           motherId: createBirthDto.motherId ?? null,
           fatherId: createBirthDto.fatherId ?? null,
@@ -84,8 +131,6 @@ export class BirthsService {
 
       return birth;
     });
-
-    return this.transformBirth(result);
   }
 
   async findAll(userId: string) {
@@ -194,28 +239,52 @@ export class BirthsService {
     motherBreed: string | undefined;
     fatherBreed: string | undefined;
   }> {
-    let motherBirth = null;
-    let fatherBirth = null;
-    let motherBreed: string | undefined;
-    let fatherBreed: string | undefined;
+    const [motherData, fatherData] = await Promise.all([
+      motherId
+        ? this.processParentAnimal(motherId, companyId)
+        : Promise.resolve(null),
+      fatherId
+        ? this.processParentAnimal(fatherId, companyId)
+        : Promise.resolve(null),
+    ]);
 
-    if (motherId) {
-      await this.validateAnimalBelongsToCompany(motherId, companyId);
-      motherBirth = await this.findBirthByAnimalId(motherId);
-      if (motherBirth) {
-        motherBreed = motherBirth.breed ?? undefined;
-      }
+    return {
+      motherBirth: motherData?.birth ?? null,
+      fatherBirth: fatherData?.birth ?? null,
+      motherBreed: motherData?.breed,
+      fatherBreed: fatherData?.breed,
+    };
+  }
+
+  private async processParentAnimal(
+    animalId: string,
+    companyId: string,
+  ): Promise<{
+    birth: { purity: string | null; breed: string | null } | null;
+    breed: string | undefined;
+  } | null> {
+    await this.validateAnimalBelongsToCompany(animalId, companyId);
+
+    const birth = await this.findBirthByAnimalId(animalId);
+    if (birth) {
+      return {
+        birth,
+        breed: birth.breed ?? undefined,
+      };
     }
 
-    if (fatherId) {
-      await this.validateAnimalBelongsToCompany(fatherId, companyId);
-      fatherBirth = await this.findBirthByAnimalId(fatherId);
-      if (fatherBirth) {
-        fatherBreed = fatherBirth.breed ?? undefined;
-      }
+    const acquisitionItem = await this.findAcquisitionItemByAnimalId(animalId);
+    if (acquisitionItem) {
+      return {
+        birth: {
+          purity: acquisitionItem.purity ?? 'po',
+          breed: acquisitionItem.breed,
+        },
+        breed: acquisitionItem.breed ?? undefined,
+      };
     }
 
-    return { motherBirth, fatherBirth, motherBreed, fatherBreed };
+    return null;
   }
 
   private async getUserCompanyId(userId: string): Promise<string> {
@@ -252,6 +321,14 @@ export class BirthsService {
       where: {
         animalId,
         deletedAt: null,
+      },
+    });
+  }
+
+  private async findAcquisitionItemByAnimalId(animalId: string) {
+    return this.prisma.acquisitionItem.findUnique({
+      where: {
+        animalId,
       },
     });
   }
@@ -403,9 +480,26 @@ export class BirthsService {
     motherBreed?: string,
     fatherBreed?: string,
   ): BirthPurity {
-    if (motherBreed === fatherBreed) {
+    // Se ambas as raças são undefined, não há informação de cruzamento
+    if (!motherBreed && !fatherBreed) {
       return BirthPurity.PO;
     }
+
+    // Se apenas uma raça está disponível, considera como PO (raça pura conhecida)
+    if (!motherBreed || !fatherBreed) {
+      return BirthPurity.PO;
+    }
+
+    // Normalize breeds for comparison (lowercase and trim)
+    const normalizedMotherBreed = motherBreed.toLowerCase().trim();
+    const normalizedFatherBreed = fatherBreed.toLowerCase().trim();
+
+    // Se ambas as raças estão disponíveis e são iguais, é PO
+    if (normalizedMotherBreed === normalizedFatherBreed) {
+      return BirthPurity.PO;
+    }
+
+    // Se ambas as raças estão disponíveis e são diferentes, é F1 (cruzamento)
     return BirthPurity.F1;
   }
 

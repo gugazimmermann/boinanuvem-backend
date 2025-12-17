@@ -1,4 +1,10 @@
-import { formatCNPJ, formatCPF, formatZipCode } from './format-utils';
+import {
+  formatCNPJ,
+  formatCPF,
+  formatZipCode,
+  normalizeCPF,
+  normalizeCNPJ,
+} from './format-utils';
 
 describe('format-utils', () => {
   describe('formatCNPJ', () => {
@@ -126,6 +132,92 @@ describe('format-utils', () => {
 
     it('should handle string with only non-digit characters', () => {
       expect(formatZipCode('abc')).toBe('abc');
+    });
+  });
+
+  describe('normalizeCPF', () => {
+    it('should normalize formatted CPF to digits only', () => {
+      expect(normalizeCPF('123.456.789-00')).toBe('12345678900');
+    });
+
+    it('should return digits-only CPF as-is', () => {
+      expect(normalizeCPF('12345678900')).toBe('12345678900');
+    });
+
+    it('should return undefined for null', () => {
+      expect(normalizeCPF(null)).toBeNull();
+    });
+
+    it('should return undefined for undefined', () => {
+      expect(normalizeCPF(undefined)).toBeUndefined();
+    });
+
+    it('should return undefined for empty string', () => {
+      expect(normalizeCPF('')).toBeUndefined();
+    });
+
+    it('should return undefined for whitespace-only string', () => {
+      expect(normalizeCPF('   ')).toBeUndefined();
+    });
+
+    it('should return original value if length is not 11 digits', () => {
+      expect(normalizeCPF('1234567890')).toBe('1234567890'); // 10 digits
+      expect(normalizeCPF('123456789001')).toBe('123456789001'); // 12 digits
+      expect(normalizeCPF('12345')).toBe('12345'); // too short
+    });
+
+    it('should return original value if not a string', () => {
+      expect(normalizeCPF(12345678900 as unknown as string)).toBe(12345678900);
+      expect(normalizeCPF({} as unknown as string)).toEqual({});
+    });
+
+    it('should handle CPF with special characters', () => {
+      expect(normalizeCPF('123.456.789-00')).toBe('12345678900');
+      expect(normalizeCPF('123-456-789-00')).toBe('12345678900');
+    });
+  });
+
+  describe('normalizeCNPJ', () => {
+    it('should normalize formatted CNPJ to digits only', () => {
+      expect(normalizeCNPJ('12.345.678/0001-90')).toBe('12345678000190');
+    });
+
+    it('should return digits-only CNPJ as-is', () => {
+      expect(normalizeCNPJ('12345678000190')).toBe('12345678000190');
+    });
+
+    it('should return undefined for null', () => {
+      expect(normalizeCNPJ(null)).toBeNull();
+    });
+
+    it('should return undefined for undefined', () => {
+      expect(normalizeCNPJ(undefined)).toBeUndefined();
+    });
+
+    it('should return undefined for empty string', () => {
+      expect(normalizeCNPJ('')).toBeUndefined();
+    });
+
+    it('should return undefined for whitespace-only string', () => {
+      expect(normalizeCNPJ('   ')).toBeUndefined();
+    });
+
+    it('should return original value if length is not 14 digits', () => {
+      expect(normalizeCNPJ('1234567800019')).toBe('1234567800019'); // 13 digits
+      expect(normalizeCNPJ('123456780001901')).toBe('123456780001901'); // 15 digits
+      expect(normalizeCNPJ('12345')).toBe('12345'); // too short
+    });
+
+    it('should return original value if not a string', () => {
+      expect(normalizeCNPJ(12345678000190 as unknown as string)).toBe(
+        12345678000190,
+      );
+      expect(normalizeCNPJ({} as unknown as string)).toEqual({});
+    });
+
+    it('should handle CNPJ with special characters', () => {
+      expect(normalizeCNPJ('12.345.678/0001-90')).toBe('12345678000190');
+      expect(normalizeCNPJ('12-345-678-0001-90')).toBe('12345678000190');
     });
   });
 });

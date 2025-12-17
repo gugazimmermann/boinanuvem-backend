@@ -10,6 +10,152 @@ import { CreateAnimalDto, UpdateAnimalDto } from './dto';
 export class AnimalsService {
   constructor(private prisma: PrismaService) {}
 
+  async findAcquisitionForAnimal(userId: string, animalId: string) {
+    const companyId = await this.getUserCompanyId(userId);
+    await this.findAnimalByIdAndCompany(animalId, companyId);
+
+    const acquisitionItem = await this.findAcquisitionItem(animalId, companyId);
+    if (!acquisitionItem) return null;
+
+    return this.transformAcquisition(acquisitionItem.acquisition);
+  }
+
+  private async findAcquisitionItem(animalId: string, companyId: string) {
+    return this.prisma.acquisitionItem.findFirst({
+      where: {
+        animalId,
+        acquisition: { deletedAt: null, companyId },
+      },
+      include: {
+        acquisition: {
+          include: { acquisitionItems: true },
+        },
+      },
+    });
+  }
+
+  private transformAcquisition(acq: {
+    id: string;
+    companyId: string;
+    propertyId: string;
+    supplierId: string;
+    acquisitionDate: Date;
+    pricingMode: string;
+    paymentMethod: string;
+    totalPrice: unknown;
+    fees: unknown;
+    transportationFee: unknown;
+    handlingFee: unknown;
+    linkedCashFlowId: string | null;
+    linkedAccountsPayableId: string | null;
+    observation: string | null;
+    acquisitionItems: Array<{
+      id: string;
+      animalId: string;
+      price: unknown;
+      weight: unknown;
+      costPerArroba: unknown;
+      breed: string | null;
+      gender: string | null;
+      birthDate: Date | null;
+      motherId: string | null;
+      fatherId: string | null;
+      motherRegistrationNumber: string | null;
+      fatherRegistrationNumber: string | null;
+      purity: string | null;
+      birthObservation: string | null;
+      createdAt: Date;
+    }>;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: acq.id,
+      companyId: acq.companyId,
+      propertyId: acq.propertyId,
+      supplierId: acq.supplierId,
+      acquisitionDate: acq.acquisitionDate,
+      pricingMode: acq.pricingMode,
+      paymentMethod: acq.paymentMethod,
+      totalPrice: this.toNumber(acq.totalPrice) ?? 0,
+      fees:
+        (acq.fees as Array<{
+          id: string;
+          name: string;
+          amount: number;
+        }> | null) ?? undefined,
+      transportationFee: this.toNumber(acq.transportationFee),
+      handlingFee: this.toNumber(acq.handlingFee),
+      linkedCashFlowId: acq.linkedCashFlowId ?? undefined,
+      linkedAccountsPayableId: acq.linkedAccountsPayableId ?? undefined,
+      observation: acq.observation ?? undefined,
+      acquisitionItems: (acq.acquisitionItems ?? []).map((item) =>
+        this.transformAcquisitionItem(item),
+      ),
+      createdAt: acq.createdAt,
+      updatedAt: acq.updatedAt,
+    };
+  }
+
+  private transformAcquisitionItem(item: {
+    id: string;
+    animalId: string;
+    price: unknown;
+    weight: unknown;
+    costPerArroba: unknown;
+    breed: string | null;
+    gender: string | null;
+    birthDate: Date | null;
+    motherId: string | null;
+    fatherId: string | null;
+    motherRegistrationNumber: string | null;
+    fatherRegistrationNumber: string | null;
+    purity: string | null;
+    birthObservation: string | null;
+    createdAt: Date;
+  }) {
+    return {
+      id: item.id,
+      animalId: item.animalId,
+      price: this.toNumber(item.price) ?? 0,
+      weight: this.toNumber(item.weight) ?? 0,
+      costPerArroba: this.toNumber(item.costPerArroba) ?? 0,
+      breed: item.breed ?? undefined,
+      gender: item.gender ?? undefined,
+      birthDate: item.birthDate ?? undefined,
+      motherId: item.motherId ?? undefined,
+      fatherId: item.fatherId ?? undefined,
+      motherRegistrationNumber: item.motherRegistrationNumber ?? undefined,
+      fatherRegistrationNumber: item.fatherRegistrationNumber ?? undefined,
+      purity: item.purity ?? undefined,
+      birthObservation: item.birthObservation ?? undefined,
+      createdAt: item.createdAt,
+    };
+  }
+
+  private toNumber(v: unknown): number | undefined {
+    if (v === null || v === undefined) return undefined;
+    if (typeof v === 'number') return v;
+    if (
+      typeof v === 'object' &&
+      typeof (v as { toNumber?: unknown }).toNumber === 'function'
+    ) {
+      return (v as { toNumber(): number }).toNumber();
+    }
+    if (typeof v === 'string') {
+      const n = Number.parseFloat(v);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    if (typeof v === 'bigint') {
+      const n = Number.parseFloat(v.toString());
+      return Number.isFinite(n) ? n : undefined;
+    }
+    if (typeof v === 'boolean') {
+      return v ? 1 : 0;
+    }
+    return undefined;
+  }
+
   async create(userId: string, createAnimalDto: CreateAnimalDto) {
     const companyId = await this.getUserCompanyId(userId);
 
