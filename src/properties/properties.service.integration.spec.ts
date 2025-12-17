@@ -1,5 +1,7 @@
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto, UpdatePropertyDto } from './dto';
+import { GeocodingService } from '../common/services/geocoding.service';
+import { PasturePlanningService } from './services/pasture-planning.service';
 import {
   describeOrSkip,
   setupIntegrationTest,
@@ -32,6 +34,22 @@ describeOrSkip('PropertiesService Integration Tests', () => {
     const module = await createServiceTestingModule(
       PropertiesService,
       context.prisma,
+      [
+        {
+          provide: GeocodingService,
+          useValue: {
+            geocodeNominatim: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: PasturePlanningService,
+          useValue: {
+            computeFromLatLng: jest
+              .fn()
+              .mockResolvedValue({ pasturePlanning: [], breedingMonths: [] }),
+          },
+        },
+      ],
     );
     service = getServiceFromModule(module, PropertiesService);
 

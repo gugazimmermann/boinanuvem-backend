@@ -7,28 +7,27 @@ import { PrismaService } from '../common/services/prisma.service';
 import { CreatePropertyDto, UpdatePropertyDto } from './dto';
 import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { Prisma } from '@prisma/client';
+import { GeocodingService } from '../common/services/geocoding.service';
+import { PasturePlanningService } from './services/pasture-planning.service';
 
 @Injectable()
 export class PropertiesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private geocoding: GeocodingService,
+    private pasturePlanning: PasturePlanningService,
+  ) {}
 
   async create(userId: string, createPropertyDto: CreatePropertyDto) {
     const companyId = await this.getUserCompanyId(userId);
 
-    // Check if property code already exists for this company (excluding soft-deleted)
-    const existingProperty = await this.prisma.property.findFirst({
-      where: {
-        companyId,
-        code: createPropertyDto.code,
-        deletedAt: null,
-      },
-    });
+    await this.assertPropertyCodeAvailable(companyId, createPropertyDto.code);
 
-    if (existingProperty) {
-      throw new ConflictException(
-        'Property with this code already exists for your company',
-      );
-    }
+    const finalLatLng = await this.resolveLatLng(createPropertyDto);
+    const computed = await this.getComputedPlanningIfNeeded(
+      createPropertyDto,
+      finalLatLng,
+    );
 
     const property = await this.prisma.property.create({
       data: {
@@ -44,13 +43,13 @@ export class PropertiesService {
         city: createPropertyDto.city,
         state: createPropertyDto.state,
         zipCode: createPropertyDto.zipCode,
-        latitude: createPropertyDto.latitude ?? null,
-        longitude: createPropertyDto.longitude ?? null,
-        pasturePlanning: createPropertyDto.pasturePlanning
-          ? (createPropertyDto.pasturePlanning as unknown as InputJsonValue)
+        latitude: finalLatLng?.latitude ?? null,
+        longitude: finalLatLng?.longitude ?? null,
+        pasturePlanning: computed.pasturePlanning
+          ? (computed.pasturePlanning as unknown as InputJsonValue)
           : Prisma.JsonNull,
-        breedingMonths: createPropertyDto.breedingMonths
-          ? (createPropertyDto.breedingMonths as unknown as InputJsonValue)
+        breedingMonths: computed.breedingMonths
+          ? (computed.breedingMonths as unknown as InputJsonValue)
           : Prisma.JsonNull,
         pasturePlanningModifiedByUser:
           createPropertyDto.pasturePlanningModifiedByUser ?? false,
@@ -340,5 +339,96 @@ export class PropertiesService {
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
     };
+  }
+
+  private async resolveLatLng(
+    dto: CreatePropertyDto,
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    if (dto.latitude != null && dto.longitude != null) {
+      return { latitude: dto.latitude, longitude: dto.longitude };
+    }
+
+    try {
+      return await this.geocoding.geocodeNominatim({
+        street: dto.street,
+        number: dto.number,
+        neighborhood: dto.neighborhood,
+        city: dto.city,
+        state: dto.state,
+        zipCode: dto.zipCode,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private async assertPropertyCodeAvailable(companyId: string, code: string) {
+    const existingProperty = await this.prisma.property.findFirst({
+      where: {
+        companyId,
+        code,
+        deletedAt: null,
+      },
+    });
+
+    if (existingProperty) {
+      throw new ConflictException(
+        'Property with this code already exists for your company',
+      );
+    }
+  }
+
+  private shouldComputePasturePlanning(dto: CreatePropertyDto): boolean {
+    return !dto.pasturePlanning && !dto.pasturePlanningModifiedByUser;
+  }
+
+  private shouldComputeBreedingMonths(dto: CreatePropertyDto): boolean {
+    return !dto.breedingMonths && !dto.breedingSeasonModifiedByUser;
+  }
+
+  private async getComputedPlanningIfNeeded(
+    dto: CreatePropertyDto,
+    latLng: { latitude: number; longitude: number } | null,
+  ): Promise<{
+    pasturePlanning: CreatePropertyDto['pasturePlanning'];
+    breedingMonths: CreatePropertyDto['breedingMonths'];
+  }> {
+    const shouldPasture = this.shouldComputePasturePlanning(dto);
+    const shouldBreeding = this.shouldComputeBreedingMonths(dto);
+
+    const pasturePlanning = dto.pasturePlanning;
+    const breedingMonths = dto.breedingMonths;
+
+    if (!shouldPasture && !shouldBreeding) {
+      return { pasturePlanning, breedingMonths };
+    }
+
+    const defaults = {
+      pasturePlanning: shouldPasture ? [] : pasturePlanning,
+      breedingMonths: shouldBreeding ? [] : breedingMonths,
+    };
+
+    if (!latLng) {
+      return defaults;
+    }
+
+    try {
+      const computed = await this.pasturePlanning.computeFromLatLng({
+        latitude: latLng.latitude,
+        longitude: latLng.longitude,
+      });
+
+      return {
+        pasturePlanning: shouldPasture
+          ? computed.pasturePlanning
+          : pasturePlanning,
+        breedingMonths: shouldBreeding
+          ? computed.breedingMonths
+          : breedingMonths,
+      };
+    } catch {
+      // If external calls fail, we still create the property and store empty defaults.
+      return defaults;
+    }
   }
 }

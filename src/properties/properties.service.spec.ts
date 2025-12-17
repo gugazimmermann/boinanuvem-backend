@@ -2,11 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { PrismaService } from '../common/services/prisma.service';
+import { GeocodingService } from '../common/services/geocoding.service';
+import { PasturePlanningService } from './services/pasture-planning.service';
 import { CreatePropertyDto, UpdatePropertyDto } from './dto';
 
 describe('PropertiesService', () => {
   let service: PropertiesService;
   let prismaService: jest.Mocked<PrismaService>;
+  let geocodingService: jest.Mocked<GeocodingService>;
+  let pasturePlanningService: jest.Mocked<PasturePlanningService>;
 
   const mockUser = {
     id: 'user-1',
@@ -66,15 +70,30 @@ describe('PropertiesService', () => {
       },
     };
 
+    const mockGeocodingService = {
+      geocodeNominatim: jest.fn(),
+    };
+
+    const mockPasturePlanningService = {
+      computeFromLatLng: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PropertiesService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: GeocodingService, useValue: mockGeocodingService },
+        {
+          provide: PasturePlanningService,
+          useValue: mockPasturePlanningService,
+        },
       ],
     }).compile();
 
     service = module.get<PropertiesService>(PropertiesService);
     prismaService = module.get(PrismaService);
+    geocodingService = module.get(GeocodingService);
+    pasturePlanningService = module.get(PasturePlanningService);
   });
 
   afterEach(() => {
@@ -90,6 +109,10 @@ describe('PropertiesService', () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.property.findFirst.mockResolvedValue(null);
       prismaService.property.create.mockResolvedValue(mockProperty);
+      pasturePlanningService.computeFromLatLng.mockResolvedValue({
+        pasturePlanning: [],
+        breedingMonths: [],
+      });
 
       const result = await service.create(mockUser.id, mockCreatePropertyDto);
 
@@ -138,6 +161,7 @@ describe('PropertiesService', () => {
       prismaService.user.findUnique.mockResolvedValue(mockUser);
       prismaService.property.findFirst.mockResolvedValue(null);
       prismaService.property.create.mockResolvedValue(mockProperty);
+      geocodingService.geocodeNominatim.mockResolvedValue(null);
 
       await service.create(mockUser.id, dtoWithoutOptional);
 
@@ -146,6 +170,47 @@ describe('PropertiesService', () => {
           complement: null,
           latitude: null,
           longitude: null,
+          pasturePlanning: expect.anything(),
+          breedingMonths: expect.anything(),
+        }),
+      });
+    });
+
+    it('should compute pasture planning and breeding months when missing', async () => {
+      const dto: CreatePropertyDto = {
+        ...mockCreatePropertyDto,
+        pasturePlanning: undefined,
+        breedingMonths: undefined,
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.property.findFirst.mockResolvedValue(null);
+      prismaService.property.create.mockResolvedValue(mockProperty);
+      pasturePlanningService.computeFromLatLng.mockResolvedValue({
+        pasturePlanning: [
+          {
+            month: 'January',
+            min: 10,
+            max: 20,
+            precipitation: 50,
+            classification: 'Medium',
+          },
+        ],
+        breedingMonths: ['April'],
+      });
+
+      await service.create(mockUser.id, dto);
+
+      expect(pasturePlanningService.computeFromLatLng).toHaveBeenCalledWith(
+        expect.objectContaining({
+          latitude: dto.latitude!,
+          longitude: dto.longitude!,
+        }),
+      );
+      expect(prismaService.property.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          pasturePlanning: expect.anything(),
+          breedingMonths: expect.anything(),
         }),
       });
     });

@@ -275,6 +275,7 @@ export async function teardownIntegrationTest(
 export async function createServiceTestingModule<T>(
   ServiceClass: new (...args: any[]) => T,
   prisma: PrismaClient,
+  extraProviders: any[] = [],
 ): Promise<TestingModule> {
   return Test.createTestingModule({
     providers: [
@@ -284,6 +285,7 @@ export async function createServiceTestingModule<T>(
         useValue: prisma,
       },
       Logger,
+      ...extraProviders,
     ],
   }).compile();
 }
